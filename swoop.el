@@ -18,7 +18,6 @@
 (defvar swoop--cached-count 0)
 (defvar swoop--minibuf-last-content "")
 (defvar swoop--last-query "")
-(defvar swoop--minibuf-last-content-for-reuse "")
 (setq swoop-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
@@ -251,21 +250,18 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
     $results))
 (defun swoop (&optional $query)
   (interactive)
-  (if current-prefix-arg
-      (swoop--core :$query swoop--minibuf-last-content-for-reuse)
-    (swoop--core :$query (or $query (swoop--pre-input)))))
+  ;; (if current-prefix-arg
+    (swoop--core :$query (or $query (swoop--pre-input))))
 (defun swoop-pcre-regexp (&optional $query)
   (interactive)
   (let ((swoop-use-pcre t))
-    (if current-prefix-arg
-        (swoop--core :$query swoop--minibuf-last-content-for-reuse)
-      (swoop--core :$query (or $query (swoop--pre-input))))))
+    ;; (if current-prefix-arg
+    (swoop--core :$query (or $query (swoop--pre-input)))))
 (defun swoop-migemo (&optional $query)
   (interactive)
   (let ((swoop-use-migemo t))
-    (if current-prefix-arg
-        (swoop--core :$query swoop--minibuf-last-content-for-reuse)
-      (swoop--core :$query (or $query (swoop--pre-input))))))
+    ;; (if current-prefix-arg
+    (swoop--core :$query (or $query (swoop--pre-input)))))
 
 (cl-defun swoop--clear-overlay (&key $to-empty $kill)
   (cl-flet ((swoop-clear-overlay
@@ -322,6 +318,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
 
 
 (setq swoop--last-visible-lines nil)
+;; (swoop--match-lines-list-common '((1 2 3 4 5) (2 3 4 8) (2 3 9)))
 (defun swoop--match-lines-list-common ($match-lines-list)
   "Return common numbers list of several numbers lists.
 '((1 2 3 4 5) (2 3 4 8) (2 3 9)) -> '(2 3)"
@@ -333,7 +330,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
       (if (> $length 1)
           (mapc (lambda ($l)
                   (setq $results (-intersection $results $l)))
-                (car $list))))
+                (cdr $list))))
     (setq swoop--last-visible-lines $results)))
 
 
@@ -364,11 +361,11 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                 ;; Show lines
                 (put-text-property $lbeg (min (1+ $lend) $max) 'invisible nil)
                 ;; Line number overlay
-                (overlay-put $lov 'before-string
-                             (propertize
-                              (format $line-format $l)
-                              'face '(:foreground "#ff9900")))
-                (overlay-put $lov 'swoop-temporary t)
+                ;; (overlay-put $lov 'before-string
+                ;;              (propertize
+                ;;               (format $line-format $l)
+                ;;               'face '(:foreground "#ff9900")))
+                ;; (overlay-put $lov 'swoop-temporary t)
                 (block stop
                   (while (re-search-forward $pattern $lend t)
                     (let* (($wbeg (match-beginning 0))
@@ -384,8 +381,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                         (overlay-put $ov 'swoop-temporary t)
                         ))))))
             (swoop--match-lines-list-common $match-lines-list)))))
-;; (swoop-words-overlay '("def" "s"))
-
+;; (swoop-words-overlay '("de" "sw"))
 
 ;; (swoop--get-match-lines-list "def")
 (cl-defun swoop--get-match-lines-list ($query &optional $visible-only)
@@ -473,7 +469,6 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
            "Swoop: " (or $query "") swoop-map nil
            query-replace-from-history-variable nil t))
       (when $timer (cancel-timer $timer) (setq $timer nil))
-      (setq swoop--minibuf-last-content-for-reuse swoop--minibuf-last-content)
       (setq swoop--minibuf-last-content "")
       ;; (with-current-buffer swoop-buffer
       ;;   (put-text-property (point-min) (point-max) 'invisible nil)
