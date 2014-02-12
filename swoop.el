@@ -19,6 +19,7 @@
 (defvar swoop--cached-count 0)
 (defvar swoop--minibuf-last-content "")
 (defvar swoop--last-query "")
+(defvar swoop--minibuf-last-content-for-reuse "")
 (setq swoop-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
@@ -191,8 +192,9 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
             ;;(setq swoop--minibuf-last-content $query)
             (when $query
               (setq swoop--minibuf-last-content $query)
-              (swoop-update
-               (split-string $query " " t) swoop-buffer))
+              (if (listp $query)
+                  (swoop-update swoop--last-query swoop-buffer)
+                (swoop-update (split-string $query " " t) swoop-buffer)))
             (swoop--read-from-string $query swoop-buffer))
         (swoop--clear-overlay)
         (swoop--invisible-off)
@@ -211,15 +213,21 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
     $results))
 (defun swoop (&optional $query)
   (interactive)
-  (swoop--core :$query (or $query (swoop--pre-input))))
+  (if current-prefix-arg
+      (swoop--core :$query swoop--minibuf-last-content-for-reuse)
+    (swoop--core :$query (or $query (swoop--pre-input)))))
 (defun swoop-pcre-regexp (&optional $query)
   (interactive)
   (let ((swoop-use-pcre t))
-    (swoop--core :$query (or $query (swoop--pre-input)))))
+    (if current-prefix-arg
+        (swoop--core :$query swoop--minibuf-last-content-for-reuse)
+      (swoop--core :$query (or $query (swoop--pre-input))))))
 (defun swoop-migemo (&optional $query)
   (interactive)
   (let ((swoop-use-migemo t))
-    (swoop--core :$query (or $query (swoop--pre-input)))))
+    (if current-prefix-arg
+        (swoop--core :$query swoop--minibuf-last-content-for-reuse)
+      (swoop--core :$query (or $query (swoop--pre-input))))))
 
 (defsubst swoop--clear-overlay () (interactive)
   (cl-flet ((swoop-clear-overlay
@@ -268,11 +276,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                     (swoop--forward-visible-line t))
                 (if (eobp)
                     (swoop--backward-visible-line t))))
-            ;; (with-selected-window swoop-target-window
-              ;; (swoop-words-overlay $query)
-              ;; )
-            )))
-    ))
+            )))))
 
 
 (setq swoop--last-visible-lines nil)
@@ -420,6 +424,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
            "Swoop: " (or $query "") swoop-map nil
            query-replace-from-history-variable nil t))
       (when $timer (cancel-timer $timer) (setq $timer nil))
+      (setq swoop--minibuf-last-content-for-reuse swoop--minibuf-last-content)
       (setq swoop--minibuf-last-content "")
       ;; (with-current-buffer swoop-buffer
       ;;   (put-text-property (point-min) (point-max) 'invisible nil)
@@ -467,6 +472,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
       (swoop--goto-line $line)
       (set-marker (make-marker) (point)))))
 
+
 (defun swoop--edit-set-properties ($buf)
   "Set edit buffer format"
   (save-excursion
@@ -482,9 +488,9 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                          "^[[:space:]]*[1-9][0-9]*::[[:space:]]" nil t))
         (end-of-line)
         (setq $eol (point))
-        (put-text-property (line-beginning-position) $eol
-                           'swoop-target
-                           (swoop--set-marker (line-number-at-pos) $buf))
+        ;; (put-text-property (line-beginning-position) $eol
+        ;;                    'swoop-target
+        ;;                    (swoop--set-marker (line-number-at-pos) $buf))
         ;; Make editable area
         (remove-text-properties $pos $eol '(read-only t))
         ;; For line trailing return
@@ -506,13 +512,14 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                                              "s:: ") $l)
                              'face 'swoop-line-number-face
                              'swoop-prefix t
+                             'swoop-target (set-marker (make-marker) (point))
                              'intangible t
                              'rear-nonsticky t)
                             (buffer-substring
                              (line-beginning-position) (line-end-position)))
                       $results))))
       $results)))
-;;(swoop--get-match-line-content swoop--last-visible-lines)
+;;(swoop--get-match-line-content (current-buffer) swoop--last-visible-lines)
 (defun swoop--edit-insert-lines ($buf $visible-lines)
   (dolist ($l (swoop--get-match-line-content $buf $visible-lines))
     (insert (format "%s%s\n" (car $l) (cdr $l)))))
@@ -545,6 +552,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
        (goto-char (point-min))
        (forward-line 1)
        (re-search-forward "^[[:space:]]*\\([0-9]+\\)::[[:space:]]" nil t)
+       (swoop-edit-mode)
        )
      ;; Args
      $bufcont
@@ -584,6 +592,72 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
     (select-window swoop-target-window)
     (kill-buffer $edit-buffer)))
 
+
+;; From replace.el
+(define-derived-mode swoop-edit-mode fundamental-mode "Swoop-Edit"
+  "Major mode for editing Swoop buffers.
+In this mode, changes to the Swoop buffer are also applied to
+the originating buffer.
+
+To return to ordinary Occur mode, use \\[swoop-cease-edit]."
+  (setq buffer-read-only nil)
+  (add-hook 'after-change-functions 'swoop-after-change-function nil t)
+  (message (substitute-command-keys
+            "Editing: Type \\[swoop-cease-edit] to return to Swoop mode.")))
+
+;; (defun swoop-cease-edit ()
+;;   "Switch from Swoop Edit mode to Swoop mode."
+;;   (interactive)
+;;   (when (derived-mode-p 'swoop-edit-mode)
+;;     (swoop-mode)
+;;     (message "Switching to Swoop mode.")))
+
+(defun swoop-after-change-function ($beg $end $length)
+  (save-excursion
+    (goto-char $beg)
+    (let* (($line-beg (line-beginning-position))
+           ($m (get-text-property $line-beg 'swoop-target))
+           ($buf (marker-buffer $m))
+           $col)
+      (when (and (get-text-property $line-beg 'swoop-prefix)
+                 (not (get-text-property $end 'swoop-prefix)))
+        (when (= $length 0)
+          ;; Apply swoop-target property to inserted (e.g. yanked) text.
+          (put-text-property $beg $end 'swoop-target $m)
+          ;; Did we insert a newline?  Occur Edit mode can't create new
+          ;; Occur entries; just discard everything after the newline.
+          (save-excursion
+            (and (re-search-forward "\n" $end t)
+                 (delete-region (1- (point)) $end))))
+        (let* (($line (- (line-number-at-pos)
+                        (line-number-at-pos (window-start))))
+               ($readonly (with-current-buffer $buf buffer-read-only))
+               ($win (or (get-buffer-window $buf)
+                        (display-buffer $buf
+                                        '(nil (inhibit-same-window . t)
+                                              (inhibit-switch-frame . t)))))
+               ($line-end (line-end-position))
+               ($text (save-excursion
+                       (goto-char (next-single-property-change
+                                   $line-beg 'swoop-prefix nil
+                                   $line-end))
+                       (setq $col (- (point) $line-beg))
+                       (buffer-substring-no-properties (point) $line-end))))
+          (with-selected-window $win
+            (goto-char $m)
+            ;; Unveil invisible block
+            (mapc (lambda ($ov)
+                    (let (($type (overlay-get $ov 'invisible)))
+                      (when $type
+                        (overlay-put $ov 'invisible nil))))
+                  (overlays-in (line-beginning-position)
+                               (line-end-position)))
+            (recenter $line)
+            (if $readonly
+                (message "Buffer `%s' is read only." $buf)
+              (delete-region (line-beginning-position) (line-end-position))
+              (insert $text))
+            (move-to-column $col)))))))
 
 
 (provide 'swoop)
