@@ -7,15 +7,14 @@
   "Group for swoop"
   :prefix "swoop-" :group 'convenience)
 
-(defvar swoop-buffer nil)
+(defvar swoop-buffer "*Swoop*")
 (defvar swoop-window nil)
 (defvar swoop-target-buffer nil)
 (defvar swoop-target-window nil)
 (defvar swoop-target-overlay nil)
 (defvar swoop-target-overlay-within-target-window nil)
 
-(defvar swoop-exit-status 0)
-
+(defvar swoop--last-position 1)
 (defvar swoop--cached-count 0)
 (defvar swoop--minibuf-last-content "")
 (defvar swoop--last-query "")
@@ -26,10 +25,26 @@
     (define-key map (kbd "C-n") 'swoop--next-line)
     (define-key map (kbd "C-p") 'swoop--prev-line)
     (define-key map (kbd "C-c C-e") 'swoop--edit)
+    (define-key map (kbd "C-g") 'swoop--cancel)
     (define-key map (kbd "RET") 'swoop--default-action)
     map))
 
+(defun swoop--cancel ()
+  "This is assigned to `C-g' as default. Exit from Swoop (minibuffer),
+and execute functions listed in swoop-abort-hook"
+  (interactive)
+  (run-with-timer
+   0 nil (lambda () (run-hooks 'swoop-abort-hook)))
+  (exit-minibuffer))
 
+(defvar swoop-abort-hook nil)
+(defun swoop-back-to-last-position ()
+  (interactive)
+  (let (($pos swoop--last-position))
+    (setq swoop--last-position (point))
+    (with-selected-window swoop-target-window
+      (goto-char $pos))))
+(add-hook 'swoop-abort-hook 'swoop-back-to-last-position)
 
 (defface swoop-target-line-face
   '((t :background "#e3e300" :foreground "#222222"))
@@ -122,60 +137,76 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
       (unless (or (bobp) (eobp))
         (swoop--move-line-within-target-window))
       (recenter))))
-(defsubst swoop--forward-visible-line (&optional $recur)
+(defsubst swoop--forward-visible-line ()
   (unless (and (bobp) (eobp))
     (if (not (eobp))
         (let ((buffer-invisibility-spec '(t))
               $pos)
-          (while (progn (re-search-forward "\n" nil t)
-                        (goto-char (line-end-position))
-                        (and (eq 'swoop (get-text-property (point) 'invisible))
-                             (not (eobp)))))
-          (goto-char (line-beginning-position))))
-    (if (and (eobp) (not (bobp)) (not $recur))
-        (swoop--backward-visible-line t))))
-(defsubst swoop--backward-visible-line (&optional $recur)
+          (save-excursion
+            (while (progn
+                     (setq $pos (re-search-forward "\n.+$" nil t))
+                     (and (eq 'swoop (get-text-property $pos 'invisible))
+                          (not (eobp))))))
+          (when (not (eq 'swoop (get-text-property $pos 'invisible)))
+            (goto-char $pos)
+            (goto-char (line-beginning-position)))))))
+(defsubst swoop--backward-visible-line ()
   (unless (and (bobp) (eobp))
     (if (not (bobp))
         (let ((buffer-invisibility-spec '(t))
-              $pos)
-          (while (progn (re-search-backward "\n" nil t)
-                        (goto-char (line-beginning-position))
-                        (and (eq 'swoop (get-text-property (point) 'invisible))
-                             (not (bobp)))))))
-    (if (and (bobp) (not (eobp)) (not $recur))
-        (swoop--forward-visible-line t))))
-(defsubst swoop--next-line () (interactive)
+              $pos
+              ($pos-min (point-min)))
+          (save-excursion
+            (while (progn (setq $pos (re-search-backward "\n" nil t))
+                          (and (eq 'swoop (get-text-property $pos 'invisible))
+                               (not (bobp))))))
+          (when (not (eq 'swoop (get-text-property $pos 'invisible)))
+            (goto-char $pos)
+            (goto-char (line-beginning-position)))))))
+(defsubst swoop--next-line ()
+  (interactive)
   (swoop--move-line 'down))
-(defsubst swoop--prev-line () (interactive)
+(defsubst swoop--prev-line ()
+  (interactive)
   (swoop--move-line 'up))
 (defsubst swoop--invisible-on ()
   (add-to-invisibility-spec 'swoop))
 (defsubst swoop--invisible-off ()
   (remove-from-invisibility-spec 'swoop))
 
+
+(defsubst swoop--buffer-selection-overlay-set ()
+  (setq swoop-target-overlay
+        (make-overlay (line-beginning-position)
+                      (min (1+ (line-end-position)) (point-max))))
+  (overlay-put swoop-target-overlay 'face 'swoop-target-line-face)
+  (overlay-put swoop-target-overlay 'priority 15))
+(defsubst swoop--target-buffer-selection-overlay-set ()
+  (setq swoop-target-overlay-within-target-window
+        (make-overlay (line-beginning-position)
+                      (min (1+ (line-end-position)) (point-max))))
+  (overlay-put swoop-target-overlay-within-target-window
+               'face 'swoop-target-line-face)
+  (overlay-put swoop-target-overlay-within-target-window 'priority 15))
+
 (global-set-key (kbd "C-o") 'swoop)
+(global-set-key (kbd "C-S-o") 'swoop-back-to-last-position)
 (global-set-key (kbd "M-o") 'swoop-pcre-regexp)
 (defvar swoop-point-at-function (lambda () (thing-at-point 'symbol)))
 (defvar swoop-target-buffer-overlay nil)
 (cl-defun swoop--core (&key $query)
+  (setq swoop--last-position (point))
+  (setq swoop-target-buffer (current-buffer))
+  (setq swoop-target-window (get-buffer-window swoop-target-buffer))
   (setq swoop-target-buffer-overlay (make-overlay (point-min) (point-max)))
   (overlay-put swoop-target-buffer-overlay 'face '(:height 0.9))
-  (setq swoop-target-overlay-within-target-window
-        (make-overlay (point-min) (point-min)))
-  (overlay-put swoop-target-overlay-within-target-window
-               'face 'swoop-target-line-face)
+  (swoop--target-buffer-selection-overlay-set)
   (save-window-excursion
     (let* (($pos (point))
            ($pos-min (point-min))
            ($bufcont (buffer-substring-no-properties $pos-min (point-max))
                      ;;(buffer-substring $pos-min (point-max))
                      ))
-      (setq swoop-target-buffer (current-buffer))
-      (setq swoop-target-window (get-buffer-window swoop-target-buffer))
-      (setq swoop-target-overlay (make-overlay $pos-min $pos-min))
-
-      (setq swoop-buffer "ttt")
       (pop-to-buffer swoop-buffer)
       (erase-buffer)
       (setq $bufcont (swoop--modify-buffer-content $bufcont))
@@ -183,13 +214,11 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
       ;; (linum-mode 1)
       ;;(swoop-line-number-overlay)
       (setq swoop-window (get-buffer-window swoop-buffer))
-      (goto-char $pos))
+      (goto-char $pos)
+      (swoop--buffer-selection-overlay-set))
     (let ((buffer-invisibility-spec '(t))) ;; temporary unvail text for org-mode, or etc
       (unwind-protect
           (progn
-            (overlay-put swoop-target-overlay 'face 'swoop-target-line-face)
-            (overlay-put swoop-target-overlay 'priority 15)
-            ;;(setq swoop--minibuf-last-content $query)
             (when $query
               (setq swoop--minibuf-last-content $query)
               (if (listp $query)
@@ -198,9 +227,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
             (swoop--read-from-string $query swoop-buffer))
         (swoop--clear-overlay)
         (swoop--invisible-off)
-        (kill-buffer swoop-buffer)
-        ;;(exit-minibuffer)
-        )
+        (kill-buffer swoop-buffer))
       )))
 (defun swoop--pre-input ()
   (let ($results)
@@ -229,7 +256,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
         (swoop--core :$query swoop--minibuf-last-content-for-reuse)
       (swoop--core :$query (or $query (swoop--pre-input))))))
 
-(defsubst swoop--clear-overlay () (interactive)
+(defsubst swoop--clear-overlay (&optional $back-to-empty)
   (cl-flet ((swoop-clear-overlay
              ($buf)
              (with-current-buffer $buf
@@ -240,8 +267,9 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
   (swoop-clear-overlay swoop-buffer)
   (swoop-clear-overlay swoop-target-buffer)
   (delete-overlay swoop-target-buffer-overlay)
-  (delete-overlay swoop-target-overlay)
-  (delete-overlay swoop-target-overlay-within-target-window)))
+  (unless $back-to-empty
+    (delete-overlay swoop-target-overlay-within-target-window)
+    (delete-overlay swoop-target-overlay))))
 
 ;; (swoop-update "" (current-buffer))
 ;; (swoop-update "d" (current-buffer))
@@ -258,7 +286,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
           (if (not $query)
               (progn
                 (put-text-property (point-min) (point-max) 'invisible nil)
-                (swoop--clear-overlay)
+                (swoop--clear-overlay t)
                 (swoop--invisible-off))
             (setq swoop-halt-search-process nil)
             (swoop--clear-overlay)
@@ -273,9 +301,9 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
             (with-selected-window swoop-window
               (unless (and (bobp) (eobp))
                 (if (bobp)
-                    (swoop--forward-visible-line t))
+                    (swoop--move-line 'down))
                 (if (eobp)
-                    (swoop--backward-visible-line t))))
+                    (swoop--move-line 'up))))
             )))))
 
 
@@ -306,20 +334,23 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
         ;;              'invisible 'swoop)
         (let* (($lbeg (line-beginning-position))
                ($lend (line-end-position))
+               ($max (point-max))
+               ($max-line-digit
+                (length (number-to-string
+                         (line-number-at-pos $max))))
                ($pattern (concat
                           "\\("
                           (mapconcat 'identity $query "\\|")
                           "\\)"))
                ($lov (make-overlay $lbeg $lend)))
           ;; Show lines
-          (put-text-property $lbeg (1+ $lend) 'invisible nil)
+          (put-text-property $lbeg (min (1+ $lend) $max) 'invisible nil)
           ;; Line number overlay
-          ;; (overlay-put $lov 'before-string
-          ;;              (propertize
-          ;;               (format "%03s:" $l)
-          ;;               'face '(:foreground "#ff9900")))
-          ;; (overlay-put $lov 'swoop-temporary t)
-          ;; (overlay-put $lov 'priority 10)
+          (overlay-put $lov 'before-string
+                       (propertize
+                        (format "%03s:" $l)
+                        'face '(:foreground "#ff9900")))
+          (overlay-put $lov 'swoop-temporary t)
           (block stop
             (while (re-search-forward $pattern $lend t)
               (let* (($wbeg (match-beginning 0))
@@ -406,7 +437,11 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                                                  (minibuffer-window))
                          (let* (($content (minibuffer-contents)))
                            (when (and (not (equal swoop--minibuf-last-content $content))
-                                      (>= (length $content) swoop-input-threshold))
+                                      (or
+                                       ;; When after becomeing empty
+                                       (equal "" $content)
+                                       ;; Avoid too many matching
+                                       (>= (length $content) swoop-input-threshold)))
                              (setq swoop--minibuf-last-content $content)
 
                              ;; MIGEMO
@@ -502,14 +537,16 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
   (with-current-buffer $buf
     (let ($results
           ($max-line-digit
-           (length (number-to-string (line-number-at-pos (buffer-end 1))))))
+           (length (number-to-string (line-number-at-pos (point-max))))))
       (save-excursion
         (dolist ($l $visible-lines)
           (swoop--goto-line $l)
           (setq $results
                 (cons (cons (propertize
-                             (format (concat "%0" (number-to-string $max-line-digit)
-                                             "s:: ") $l)
+                             (format (concat
+                                      "%0"
+                                      (number-to-string $max-line-digit)
+                                      "s:: ") $l)
                              'face 'swoop-line-number-face
                              'swoop-prefix t
                              'swoop-target (set-marker (make-marker) (point))
@@ -533,8 +570,9 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
     (run-with-timer
      0 nil
      (lambda ($bufcont $bufname $bufwindow $visible-lines)
-       (pop-to-buffer "swoop for edit")
+       (pop-to-buffer "*Swoop Edit*")
        (erase-buffer)
+       (setq header-line-format "\\\\[swoop]")
        (use-local-map swoop-edit-map)
        (set (make-local-variable 'swoop-target-buffer) $bufname)
        (set (make-local-variable 'swoop-target-window) $bufwindow)
@@ -545,15 +583,14 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                 'intangible t))
        ;; Body
        (swoop--edit-insert-lines $bufname $visible-lines)
-
        ;; Set properties
        (swoop--edit-set-properties $bufname)
        ;; Goto first editable point
        (goto-char (point-min))
        (forward-line 1)
        (re-search-forward "^[[:space:]]*\\([0-9]+\\)::[[:space:]]" nil t)
-       (swoop-edit-mode)
-       )
+       (add-hook 'after-change-functions
+                 'swoop-after-change-function nil t))
      ;; Args
      $bufcont
      (buffer-name swoop-target-buffer)
@@ -593,17 +630,18 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
     (kill-buffer $edit-buffer)))
 
 
-;; From replace.el
-(define-derived-mode swoop-edit-mode fundamental-mode "Swoop-Edit"
-  "Major mode for editing Swoop buffers.
-In this mode, changes to the Swoop buffer are also applied to
-the originating buffer.
 
-To return to ordinary Occur mode, use \\[swoop-cease-edit]."
-  (setq buffer-read-only nil)
-  (add-hook 'after-change-functions 'swoop-after-change-function nil t)
-  (message (substitute-command-keys
-            "Editing: Type \\[swoop-cease-edit] to return to Swoop mode.")))
+;; ;; From replace.el
+;; (define-derived-mode swoop-edit-mode fundamental-mode "Swoop-Edit"
+;;   "Major mode for editing Swoop buffers.
+;; In this mode, changes to the Swoop buffer are also applied to
+;; the originating buffer.
+
+;; To return to ordinary Occur mode, use \\[swoop]."
+;;   (setq buffer-read-only nil)
+;;   (add-hook 'after-change-functions 'swoop-after-change-function nil t)
+;;   (message (substitute-command-keys
+;;             "Editing: Type \\[swoop] to return to Swoop mode.")))
 
 ;; (defun swoop-cease-edit ()
 ;;   "Switch from Swoop Edit mode to Swoop mode."
@@ -611,6 +649,9 @@ To return to ordinary Occur mode, use \\[swoop-cease-edit]."
 ;;   (when (derived-mode-p 'swoop-edit-mode)
 ;;     (swoop-mode)
 ;;     (message "Switching to Swoop mode.")))
+
+
+;;(lookup-key swoop-map (kbd "C-n"))
 
 (defun swoop-after-change-function ($beg $end $length)
   (save-excursion
