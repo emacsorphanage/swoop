@@ -141,8 +141,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
           (while (progn (re-search-backward "\n" nil t)
                         (goto-char (line-beginning-position))
                         (and (eq 'swoop (get-text-property (point) 'invisible))
-                             (not (bobp)))))
-))
+                             (not (bobp)))))))
     (if (and (bobp) (not (eobp)) (not $recur))
         (swoop--forward-visible-line t))))
 (defsubst swoop--next-line () (interactive)
@@ -444,80 +443,80 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
      (insert $bufcont)
      ;; Embed line number infomation
      (goto-char (point-min))
-     (addd-text-properties
+     (add-text-properties
       (point) (line-end-position)
-      '(swoop-line-num (line-number-at-pos)
-                       'swoop-target t)
+      `(swoop-line-num ,(line-number-at-pos)
+                       swoop-target t))
      (while (re-search-forward "\n" nil t)
-       (addd-text-properties
+       (add-text-properties
         (point) (line-end-position)
-        '(swoop-line-num (line-number-at-pos)
-                         'swoop-target t)
+        `(swoop-line-num ,(line-number-at-pos)
+                         swoop-target t)))
      (buffer-substring (point-min) (point-max)))
    ;;$bufcont
    'face '(:height 0.9)))
 
-(defun swoop--edit-set-properties ()
+;; (swoop--line-beg-point 400)
+(defsubst swoop--line-beg-point ($line &optional $buf)
+  (with-current-buffer (or $buf (current-buffer))
+    (save-excursion
+      (swoop--goto-line $line) (point))))
+(defsubst swoop--set-marker ($line &optional $buf)
+  (with-current-buffer (or $buf (current-buffer))
+    (save-excursion
+      (swoop--goto-line $line)
+      (set-marker (make-marker) (point)))))
+
+(defun swoop--edit-set-properties ($buf)
   "Set edit buffer format"
   (save-excursion
     (goto-char (point-min))
     (add-text-properties (point-min) (point-max)
                          '(read-only t rear-nonsticky t front-sticky t))
-    (let* ((line-move-ignore-invisible t)
-           (inhibit-read-only t)
+    (let* ((inhibit-read-only t)
            ($pos (point))
-           ($max-line-digit (length (number-to-string (line-number-at-pos (buffer-end 1)))))
-           $bol $eol $linu-num)
-      (while (and $pos (not (eobp)))
+           ($max-line-digit
+            (length (number-to-string (line-number-at-pos (buffer-end 1)))))
+           $pos $eol)
+      (while (setq $pos (re-search-forward
+                         "^[[:space:]]*[1-9][0-9]*::[[:space:]]" nil t))
         (end-of-line)
         (setq $eol (point))
-        (setq $line-num (get-text-property $eol 'swoop-line-num)) ;; From end point
-        (beginning-of-line)
-        (setq $bol (point))
+        (put-text-property (line-beginning-position) $eol
+                           'swoop-target
+                           (swoop--set-marker (line-number-at-pos) $buf))
         ;; Make editable area
-        (remove-text-properties $bol $eol '(read-only t))
+        (remove-text-properties $pos $eol '(read-only t))
         ;; For line trailing return
-        (set-text-properties $eol (if (< $eol (point-max))
-                                      (1+ $eol) (point-max))
-                             '(read-only t rear-nonsticky t))
-        ;; Set line number
-        (if $line-num
-            (insert (propertize
-                     (format (concat "%0" (number-to-string $max-line-digit)
-                                     "s:: ") $line-num)
-                     'face 'swoop-line-number-face
-                     'swoop-prefix (set-marker (make-marker) $bol)
-                     'intangible t
-                     'read-only t)))
-        (next-line 1)
-        (setq $pos (point))))))
+        (set-text-properties $eol (1+ $eol)
+                             '(read-only t rear-nonsticky t))))))
 
-(defun swoop--get-match-line-content ()
-  (let (($results)
-        ($max-line-digit
-         (length (number-to-string (line-number-at-pos (buffer-end 1))))))
-    (save-excursion
-      (dolist ($l swoop--last-visible-lines)
-        (swoop--goto-line $l)
-        (setq $results
-              (cons (cons (propertize
-                           (format (concat "%0" (number-to-string $max-line-digit)
-                                           "s:: ") $l)
-                           'face 'swoop-line-number-face
-                           'intangible t
-                           'read-only t)
-                          (buffer-substring
-                           (line-beginning-position) (line-end-position)))
-                    $results))))
-    $results))
-;;(swoop--get-match-line-content)
-(dolist ($l (swoop--get-match-line-content))
-  (insert (format "\n%s" $l)))
-;; ( 92::  . (defsubst swoop--goto-line ($line))
-;; ( 99::  .       (swoop--goto-line $line-num))
-;; (301::  .         (swoop--goto-line $l))
-;; (497::  .          (length (number-to-string (line-number-at-pos (buffer-end 1)))))))
-
+(defun swoop--get-match-line-content ($buf $visible-lines)
+  " `$visible-lines' is like '(20 30 33 50 ...)"
+  (with-current-buffer $buf
+    (let ($results
+          ($max-line-digit
+           (length (number-to-string (line-number-at-pos (buffer-end 1))))))
+      (save-excursion
+        (dolist ($l $visible-lines)
+          (swoop--goto-line $l)
+          (setq $results
+                (cons (cons (propertize
+                             (format (concat "%0" (number-to-string $max-line-digit)
+                                             "s:: ") $l)
+                             'face 'swoop-line-number-face
+                             'swoop-prefix t
+                             'intangible t
+                             'rear-nonsticky t)
+                            (buffer-substring
+                             (line-beginning-position) (line-end-position)))
+                      $results))))
+      $results)))
+;;(swoop--get-match-line-content swoop--last-visible-lines)
+(defun swoop--edit-insert-lines ($buf $visible-lines)
+  (dolist ($l (swoop--get-match-line-content $buf $visible-lines))
+    (insert (format "%s%s\n" (car $l) (cdr $l)))))
+;; (swoop--edit-insert-lines swoop--last-visible-lines)
 
 (defun swoop--edit ()
   (interactive)
@@ -526,7 +525,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                      (point-min) (point-max)))))
     (run-with-timer
      0 nil
-     (lambda ($bufcont $bufname $bufwindow)
+     (lambda ($bufcont $bufname $bufwindow $visible-lines)
        (pop-to-buffer "swoop for edit")
        (erase-buffer)
        (use-local-map swoop-edit-map)
@@ -538,18 +537,23 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                 'face '(:height 1.5 :background "#333333" :foreground "#eeeeee")
                 'intangible t))
        ;; Body
-       (insert $bufcont)
-       (goto-char (point-min))
-       (next-line 1)
-       (re-search-forward "^[[:space:]]*\\([0-9]+\\)::[[:space:]]" nil t)
+       (swoop--edit-insert-lines $bufname $visible-lines)
+
        ;; Set properties
-       (swoop--edit-set-properties))
+       (swoop--edit-set-properties $bufname)
+       ;; Goto first editable point
+       (goto-char (point-min))
+       (forward-line 1)
+       (re-search-forward "^[[:space:]]*\\([0-9]+\\)::[[:space:]]" nil t)
+       )
      ;; Args
-     $bufcont (buffer-name swoop-target-buffer) swoop-target-window)
+     $bufcont
+     (buffer-name swoop-target-buffer)
+     swoop-target-window
+     swoop--last-visible-lines)
     (exit-minibuffer)))
 
 (defun swoop--edit-apply-changes ()
-  (interactive)
   (let (($results)
         ($edit-buffer (current-buffer)))
     ;; (let ((inhibit-read-only t))
