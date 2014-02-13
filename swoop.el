@@ -1,4 +1,4 @@
-
+;;; Code
 (require 'dash)
 (require 'hi-lock)
 ;; (my-nest-specific-text-property-position 'invisible 'swoop)
@@ -12,19 +12,18 @@
 (defvar swoop-window nil)
 (defvar swoop-target-buffer nil)
 (defvar swoop-target-window nil)
-(defvar swoop-buffer-word-overlay nil)
-(defvar swoop-target-buffer-word-overlay nil)
+(defvar swoop-buffer-selection-overlay nil)
+(defvar swoop-target-buffer-selection-overlay nil)
 
 (defvar swoop--last-position 1)
 (defvar swoop--cached-count 0)
 (defvar swoop--minibuf-last-content "")
 (defvar swoop--last-query "")
-(setq swoop-map
+(defvar swoop-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
     (define-key map (kbd "C-n") 'swoop--next-line)
     (define-key map (kbd "C-p") 'swoop--prev-line)
-    (define-key map (kbd "C-c C-e") 'swoop--edit)
     (define-key map (kbd "C-g") 'swoop--cancel)
     (define-key map (kbd "RET") 'swoop--default-action)
     (define-key map (kbd "<C-return>") 'swoop--default-action)
@@ -62,14 +61,14 @@ and execute functions listed in swoop-abort-hook"
 
 (defmacro swoop--mapc ($variable $list &rest $body)
   (declare (indent 2))
-  (let (($list-unique (gensym)))
+  (let (($list-unique (cl-gensym)))
     `(let ((,$list-unique ,$list))
        (mapc (lambda (,$variable)
                ,@$body)
              ,$list-unique))))
 (defmacro swoop--mapcr ($variable $list &rest $body)
   (declare (indent 2))
-  (let (($list-unique (gensym)))
+  (let (($list-unique (cl-gensym)))
     `(let ((,$list-unique ,$list)
            ($results))
        (mapc (lambda (,$variable)
@@ -109,10 +108,10 @@ and execute functions listed in swoop-abort-hook"
    (with-current-buffer swoop-target-buffer (point)))
   (exit-minibuffer))
 
-(setq swoop-window-split-current-window nil)
+(defvar swoop-window-split-current-window nil)
 ;; 'split-window-horizontally 'split-window-vertically
-(setq swoop-window-split-direction 'split-window-vertically)
-(setq swoop-display-function
+(defvar swoop-window-split-direction 'split-window-vertically)
+(defvar swoop-display-function
   (lambda ($buf)
     (if swoop-window-split-current-window
         (funcall swoop-window-split-direction)
@@ -120,22 +119,20 @@ and execute functions listed in swoop-abort-hook"
         (funcall swoop-window-split-direction)))
     (other-window 1)
     (switch-to-buffer $buf)))
-;; (funcall swoop-display-function "aaa")
-
 
 (defvar swoop-invisible-targets nil)
 (defsubst swoop--restore-unveiled-overlay ()
   (when swoop-invisible-targets
-    (swoop--mapc $ov (cdr $ov) (overlay-put (car $ov) 'invisible (cdr $ov)))
-          swoop-invisible-targets)
-    (setq swoop-invisible-targets nil))
+    (swoop--mapc $ov swoop-invisible-targets
+      (overlay-put (car $ov) 'invisible (cdr $ov)))
+    (setq swoop-invisible-targets nil)))
 (defsubst swoop--unveil-invisible-overlay ()
   "Show hidden text temporarily to view it during swoop.
-This function needs to call after latest swoop-target-buffer-word-overlay moved."
+This function needs to call after latest swoop-target-buffer-selection-overlay moved."
   (swoop--restore-unveiled-overlay)
   (swoop--mapc $ov
-      (overlays-in (overlay-start swoop-target-buffer-word-overlay)
-                   (overlay-end swoop-target-buffer-word-overlay))
+      (overlays-in (overlay-start swoop-target-buffer-selection-overlay)
+                   (overlay-end swoop-target-buffer-selection-overlay))
     (let (($type (overlay-get $ov 'invisible)))
       (when $type
         (overlay-put $ov 'invisible nil)
@@ -149,7 +146,7 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
   (with-selected-window swoop-target-window
     (swoop--goto-line $line-num)
     (move-overlay
-     swoop-target-buffer-word-overlay
+     swoop-target-buffer-selection-overlay
      (point) (min (1+ (line-end-position)) (point-max)))
     (swoop--unveil-invisible-overlay)
     (recenter)))
@@ -193,7 +190,7 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
                      (move-beginning-of-line 1))
                     (t (move-beginning-of-line 1)))))
       (move-overlay
-       swoop-buffer-word-overlay
+       swoop-buffer-selection-overlay
        (point) (min (1+ (line-end-position)) (point-max)))
       (unless (or (bobp) (eobp))
         (swoop--move-line-within-target-window (line-number-at-pos)))
@@ -211,18 +208,18 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
 
 
 (defsubst swoop--buffer-selection-overlay-set ()
-  (setq swoop-buffer-word-overlay
+  (setq swoop-buffer-selection-overlay
         (make-overlay (line-beginning-position)
                       (min (1+ (line-end-position)) (point-max))))
-  (overlay-put swoop-buffer-word-overlay 'face 'swoop-target-line-face)
-  (overlay-put swoop-buffer-word-overlay 'priority 15))
+  (overlay-put swoop-buffer-selection-overlay 'face 'swoop-target-line-face)
+  (overlay-put swoop-buffer-selection-overlay 'priority 15))
 (defsubst swoop--target-buffer-selection-overlay-set ()
-  (setq swoop-target-buffer-word-overlay
+  (setq swoop-target-buffer-selection-overlay
         (make-overlay (line-beginning-position)
                       (min (1+ (line-end-position)) (point-max))))
-  (overlay-put swoop-target-buffer-word-overlay
+  (overlay-put swoop-target-buffer-selection-overlay
                'face 'swoop-target-line-face)
-  (overlay-put swoop-target-buffer-word-overlay 'priority 15))
+  (overlay-put swoop-target-buffer-selection-overlay 'priority 15))
 
 (global-set-key (kbd "C-o") 'swoop)
 (global-set-key (kbd "C-S-o") 'swoop-back-to-last-position)
@@ -254,7 +251,8 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
       (swoop--buffer-selection-overlay-set))
     (let ((buffer-invisibility-spec '(t))) ;; temporary unvail text for org-mode, or etc
       (unwind-protect
-          (progn
+          (when (get-buffer swoop-target-buffer)
+            (setq swoop--async-box nil)
             (when $query
               (setq swoop--minibuf-last-content $query)
               (if (listp $query)
@@ -262,6 +260,7 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
                 (swoop-update (split-string $query " " t) swoop-buffer)))
             (swoop--read-from-string $query swoop-buffer))
         (swoop--clear-overlay :$kill t)
+        ;; (swoop--clear-overlay)
         (swoop--invisible-off)))))
 (defun swoop--pre-input ()
   (let ($results)
@@ -297,56 +296,51 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
   (when font-lock-fontified (font-lock-fontify-buffer))))
 (cl-defun swoop--clear-overlay (&key $to-empty $kill)
   (swoop--mapc $buf (list swoop-target-buffer swoop-buffer)
-    (with-current-buffer $buf
-      (my-delete/clear-all-highlight-lock)
-      (swoop--mapc $ov (overlays-in (point-min) (point-max))
-                 (when (overlay-get $ov 'swoop-temporary)
-                   (delete-overlay $ov))))
+    (when (get-buffer swoop-buffer)
+      (with-current-buffer $buf
+        (my-delete/clear-all-highlight-lock)
+        (swoop--mapc $ov (overlays-in (point-min) (point-max))
+          (when (overlay-get $ov 'swoop-temporary)
+            (delete-overlay $ov))))))
   (delete-overlay swoop-target-buffer-overlay)
   (unless $to-empty
-    (delete-overlay swoop-target-buffer-word-overlay)
+    (delete-overlay swoop-target-buffer-selection-overlay)
     (unless $kill
-      (delete-overlay swoop-buffer-word-overlay)))
-  (if $kill
-      (kill-buffer swoop-buffer))))
+      (delete-overlay swoop-buffer-selection-overlay)))
+  (if (and $kill (get-buffer swoop-buffer))
+      (kill-buffer swoop-buffer)))
 
 ;; (swoop-update "" (current-buffer))
 ;; (swoop-update "d" (current-buffer))
 
+(defvar swoop--keep-buffer-position 1)
 (defvar swoop-halt-search-process nil)
 (defun swoop-update ($query $buf)
-  (unless (listp $query)
-    (setq $query (split-string $query " " t)))
-  (setq swoop--last-query $query)
-  (setq swoop-halt-search-process t)
-  (unwind-protect
-      (with-current-buffer $buf
-        (let ((inhibit-modification-hooks t))
-          (if (not $query)
-              (progn
-                (put-text-property (point-min) (point-max) 'invisible nil)
-                (swoop--clear-overlay :$to-empty t)
-                (swoop--invisible-off))
-            (setq swoop-halt-search-process nil)
-            (swoop--clear-overlay)
-            (swoop--invisible-off)
-            (put-text-property (point-min) (point-max) 'invisible 'swoop)
-            (swoop-words-overlay $query)
-            ;; Turn on invisible
-            (swoop--invisible-on)
-            (swoop--move-line 'init)
-
-            ;; Adjust swoop buffer cursor position
-            (with-selected-window swoop-window
-              (unless (and (bobp) (eobp))
-                (if (bobp)
-                    (swoop--move-line 'down))
-                (if (eobp)
-                    (swoop--move-line 'up))))
-            )))))
+  (when (get-buffer $buf)
+    (unless (listp $query)
+      (setq $query (split-string $query " " t)))
+    (setq swoop--last-query $query)
+    (setq swoop-halt-search-process t)
+    (unwind-protect
+        (with-current-buffer $buf
+          (let ((inhibit-modification-hooks t))
+            (if (not $query)
+                (progn
+                  (put-text-property (point-min) (point-max) 'invisible nil)
+                  (swoop--clear-overlay :$to-empty t)
+                  (swoop--invisible-off))
+              (setq swoop-halt-search-process nil)
+              (setq swoop--keep-buffer-position (point))
+              (swoop--clear-overlay)
+              (swoop--invisible-off)
+              (put-text-property (point-min) (point-max) 'invisible 'swoop)
+              (swoop-words-overlay $query)
+              ;; Turn on invisible
+              (swoop--invisible-on)
+              (swoop--move-line 'init)))))))
 
 
-(setq swoop--last-visible-lines nil)
+(defvar swoop--last-visible-lines nil)
 ;; (swoop--match-lines-list-common '((1 2 3 4 5) (2 3 4 8) (2 3 9)))
 (defun swoop--match-lines-list-common ($match-lines-list)
   "Return common numbers list of several numbers lists.
@@ -362,57 +356,129 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
     (setq swoop--last-visible-lines $results)))
 
 
+(defun swoop--words-overlay ($pattern $line-format)
+  (interactive)
+  (swoop--mapc $l (swoop--match-lines-list-common swoop--async-box)
+    (swoop--goto-line $l)
+    ;; (overlay-put (make-overlay (line-beginning-position) (1+ (line-end-position)))
+    ;;              'invisible 'swoop)
+    (let* (($lbeg (line-beginning-position))
+           ($lend (line-end-position))
+           ($lov (make-overlay $lbeg $lend)))
+      ;; Show lines
+      (put-text-property $lbeg (min (1+ $lend) (point-max)) 'invisible nil)
+      ;; Line number overlay
+      (overlay-put $lov 'before-string
+                   (propertize
+                    (format $line-format $l)
+                    'face '(:foreground "#ff9900")))
+      (overlay-put $lov 'swoop-temporary t)
+
+      (hi-lock-set-pattern $pattern 'swoop-target-words-face)
+      (with-selected-window swoop-target-window
+        (hi-lock-set-pattern $pattern 'swoop-target-words-face))
+      ))
+  (with-selected-window swoop-window
+    ;; Keep position near where the cursor was at before update the list
+    (goto-char swoop--keep-buffer-position)
+    (swoop--move-line 'init)
+    ;; Back to inner list if the cursor at the top or at the bottom of the list
+    (cond ((and (bobp) (eobp))
+           nil)
+          ((bobp)
+           (swoop--next-line))
+          ((eobp)
+           (swoop--prev-line)))))
+
+(defun swoop--async-count ($result $length $pattern $line-format)
+  (if (equal swoop--async-latest-tag (car $result))
+      (progn
+        (setq swoop--async-box
+              (cons (cdr $result)
+                    swoop--async-box))
+        (if (eq $length (length swoop--async-box))
+            (swoop--words-overlay $pattern $line-format)))
+    (setq swoop--async-box nil)))
+;; (swoop--async-count (cons swoop--async-latest-tag '(9 8 7 6)) 3)
+
+
+(defvar swoop--async-box nil)
+(defvar swoop--async-latest-tag nil)
+(defvar swoop--async-fn (byte-compile 'swoop--get-match-lines-list-async))
 (cl-defun swoop-words-overlay ($query)
-  (let* (($match-lines-list nil)
+  (let* (($buf (current-buffer)) ;; Must be swoop-buffer
+         ($bufcont (buffer-substring-no-properties (point-min) (point-max)))
+         ($mhhatch-lines-list nil)
          ($max (point-max))
+         ($length (length $query))
          ($max-line-digit
           (length (number-to-string
                    (line-number-at-pos $max))))
          ($line-format (concat "%0" (number-to-string
                                      $max-line-digit) "s:"))
          ($pattern (concat
-                    "\\("
-                    (mapconcat 'identity $query "\\|")
+                    "\\(" (mapconcat 'identity $query "\\|")
                     "\\)")))
+    (setq swoop--async-latest-tag (symbol-name (cl-gensym)))
     (save-excursion
       (swoop--mapc $q $query
-        (setq $match-lines-list
-              (cons (swoop--get-match-lines-list $q) $match-lines-list)))
-      (swoop--mapc $l (swoop--match-lines-list-common $match-lines-list)
-        (swoop--goto-line $l)
-        ;; (overlay-put (make-overlay (line-beginning-position) (1+ (line-end-position)))
-        ;;              'invisible 'swoop)
-        (let* (($lbeg (line-beginning-position))
-               ($lend (line-end-position))
-               ($lov (make-overlay $lbeg $lend)))
-          ;; Show lines
-          (put-text-property $lbeg (min (1+ $lend) $max) 'invisible nil)
-          ;; Line number overlay
-          (overlay-put $lov 'before-string
-                       (propertize
-                        (format $line-format $l)
-                        'face '(:foreground "#ff9900")))
-          (overlay-put $lov 'swoop-temporary t)
+        ;; (setq $match-lines-list
+        ;;       (cons (swoop--get-match-lines-list $q) $match-lines-list))
 
-          (hi-lock-set-pattern $pattern 'swoop-target-words-face)
-          (with-selected-window swoop-target-window
-            (hi-lock-set-pattern $pattern 'swoop-target-words-face))
-          ;; (block stop
-          ;;   (while (re-search-forward $pattern $lend t)
-          ;;     (let* (($wbeg (match-beginning 0))
-          ;;            ($wend (match-end 0))
-          ;;            ($ov (make-overlay $wbeg $wend)))
-          ;;       (if (eq $wbeg $wend) (cl-return-from stop nil))
-          ;;       (if swoop-halt-search-process (cl-return-from stop nil))
-          ;;       (overlay-put $ov 'face 'swoop-target-words-face)
-          ;;       (overlay-put $ov 'swoop-temporary t)
-          ;;       (with-selected-window swoop-target-window
-          ;;         (setq $ov (make-overlay $wbeg $wend))
-          ;;         (overlay-put $ov 'face 'swoop-target-words-face)
-          ;;         (overlay-put $ov 'swoop-temporary t)
-          ;;         ))))
-          )))))
-;; (swoop-words-overlay '("de" "sw"))
+        (async-start
+         `(lambda ()
+            (insert ,$bufcont)
+            (goto-char (point-min))
+            (cons ,swoop--async-latest-tag (funcall ,swoop--async-fn ,$q)))
+         `(lambda ($result)
+           (when (get-buffer ,$buf)
+             (with-current-buffer ,$buf
+               (swoop--async-count $result ,$length ,$pattern ,$line-format)
+               ;; (setq swoop--async-box (cons $result swoop--async-box))
+               ;; (princ (cons (type-of $result) $result))
+               ;; (swoop--words-overlay ,$pattern ,$length ,$line-format)
+               ))
+           ))
+        ))
+    ))
+
+          ;; (swoop--mapc $l (swoop--match-lines-list-common $match-lines-list)
+          ;;   (swoop--goto-line $l)
+          ;;   ;; (overlay-put (make-overlay (line-beginning-position) (1+ (line-end-position)))
+          ;;   ;;              'invisible 'swoop)
+          ;;   (let* (($lbeg (line-beginning-position))
+          ;;          ($lend (line-end-position))
+          ;;          ($lov (make-overlay $lbeg $lend)))
+          ;;     ;; Show lines
+          ;;     (put-text-property $lbeg (min (1+ $lend) $max) 'invisible nil)
+          ;;     ;; Line number overlay
+          ;;     (overlay-put $lov 'before-string
+          ;;                  (propertize
+          ;;                   (format $line-format $l)
+          ;;                   'face '(:foreground "#ff9900")))
+          ;;     (overlay-put $lov 'swoop-temporary t)
+
+          ;;     (hi-lock-set-pattern $pattern 'swoop-target-words-face)
+          ;;     (with-selected-window swoop-target-window
+          ;;       (hi-lock-set-pattern $pattern 'swoop-target-words-face))
+          ;;     ;; (cl-block stop
+          ;;     ;;   (while (re-search-forward $pattern $lend t)
+          ;;     ;;     (let* (($wbeg (match-beginning 0))
+          ;;     ;;            ($wend (match-end 0))
+          ;;     ;;            ($ov (make-overlay $wbeg $wend)))
+          ;;     ;;       (if (eq $wbeg $wend) (cl-return-from stop nil))
+          ;;     ;;       (if swoop-halt-search-process (cl-return-from stop nil))
+          ;;     ;;       (overlay-put $ov 'face 'swoop-target-words-face)
+          ;;     ;;       (overlay-put $ov 'swoop-temporary t)
+          ;;     ;;       (with-selected-window swoop-target-window
+          ;;     ;;         (setq $ov (make-overlay $wbeg $wend))
+          ;;     ;;         (overlay-put $ov 'face 'swoop-target-words-face)
+          ;;     ;;         (overlay-put $ov 'swoop-temporary t)
+          ;;     ;;         ))))
+          ;;     ))
+          ;; )
+
+
 
 ;; (swoop--get-match-lines-list "def")
 (cl-defun swoop--get-match-lines-list ($query &optional $visible-only)
@@ -420,7 +486,7 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
     (goto-char (point-min))
     (let (($pos (re-search-forward $query nil t))
           ($match-lines nil))
-      (block stop
+      (cl-block stop
         (while $pos
           (if $visible-only
               (if (not (get-text-property (point) 'invisible))
@@ -435,6 +501,23 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
           (if (eq $pos (setq $pos (re-search-forward $query nil t)))
               (cl-return-from stop nil))))
       $match-lines)))
+(cl-defun swoop--get-match-lines-list-async ($query)
+  (save-excursion
+    (goto-char (point-min))
+    (let (($pos (re-search-forward $query nil t))
+          ($match-lines nil))
+      (cl-block stop
+        (while $pos
+          (setq $match-lines (cons
+                              (if (bolp)
+                                  (1- (line-number-at-pos)) ;; end of return match
+                                (line-number-at-pos))
+                              $match-lines))
+          (forward-line 1)
+          (if (eq $pos (setq $pos (re-search-forward $query nil t)))
+              (cl-return-from stop nil))))
+      $match-lines)))
+;; (swoop--get-match-lines-list-async "a")
 
 
 ;; \w{2,3}.html?$
@@ -459,7 +542,7 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
       (shell-command-to-string
        (concat "cmigemo" " -w " $q " " swoop-migemo-options))))))
 
-(defvar swoop-input-dilay 0.20)
+(defvar swoop-input-dilay 0.10)
 (defvar swoop-input-threshold 2)
 (defun swoop--read-from-string ($query $buf)
   (let (($timer nil))
@@ -476,10 +559,13 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
                          (let* (($content (minibuffer-contents)))
                            (when (and (not (equal swoop--minibuf-last-content $content))
                                       (or
-                                       ;; When after becomeing empty
+                                       ;; When becomeing empty again
                                        (equal "" $content)
                                        ;; Avoid too many matching
                                        (>= (length $content) swoop-input-threshold)))
+                             ;; Stop old async process
+                             (setq swoop--async-box nil)
+
                              (setq swoop--minibuf-last-content $content)
 
                              ;; MIGEMO
@@ -506,14 +592,16 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
 ;; あいうえお　さしすせそ
 ;; ああああああああ
 
-;; ----------------------------------------------------------------------
+;; @ Edit mode -------------------------------------------------------------
 
-(setq swoop-edit-map
+(defvar swoop-edit-map
   (let (($map (make-sparse-keymap)))
     ;; (define-key $map (kbd "C-x C-s") 'swoop--edit-apply-changes)
     (define-key $map (kbd "C-x C-s") 'swoop--edit-finish)
     (define-key $map (kbd "C-c C-c") 'swoop--edit-finish)
     $map))
+(define-key swoop-map (kbd "C-c C-e") 'swoop--edit)
+
 (defvar swoop-edit-buffer "*Swoop Edit*")
 
 (defun swoop--edit-finish ()
@@ -642,25 +730,6 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
      swoop--last-visible-lines)
     (exit-minibuffer)))
 
-;; ;; From replace.el
-;; (define-derived-mode swoop-edit-mode fundamental-mode "Swoop-Edit"
-;;   "Major mode for editing Swoop buffers.
-;; In this mode, changes to the Swoop buffer are also applied to
-;; the originating buffer.
-
-;; To return to ordinary Occur mode, use \\[swoop]."
-;;   (setq buffer-read-only nil)
-;;   (add-hook 'after-change-functions 'swoop-after-change-function nil t)
-;;   (message (substitute-command-keys
-;;             "Editing: Type \\[swoop] to return to Swoop mode.")))
-
-;; (defun swoop-cease-edit ()
-;;   "Switch from Swoop Edit mode to Swoop mode."
-;;   (interactive)
-;;   (when (derived-mode-p 'swoop-edit-mode)
-;;     (swoop-mode)
-;;     (message "Switching to Swoop mode.")))
-
 (defun swoop-after-change-function ($beg $end $length)
   (save-excursion
     (goto-char $beg)
@@ -709,3 +778,17 @@ This function needs to call after latest swoop-target-buffer-word-overlay moved.
             (move-to-column $col)))))))
 
 (provide 'swoop)
+;;; swoop.el ends here
+
+
+;; (setq fi 99)
+;; (async-start
+;;  `(lambda ()
+;;     (insert ,(buffer-substring-no-properties (point-min) (point-max)))
+;;     (goto-char (point-min))
+;;     (funcall ,swoop--async-fn "a"))
+;;  `(lambda (result)
+;;     (with-current-buffer ,cf
+;;       (setq fi result)
+;;       (insert (format "%s" result))
+;;     )))
