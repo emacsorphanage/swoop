@@ -1,5 +1,6 @@
-(require 'pcre2el)
+
 (require 'dash)
+(require 'hi-lock)
 ;; (my-nest-specific-text-property-position 'invisible 'swoop)
 ;; buffer-invisibility-spec
 
@@ -11,8 +12,8 @@
 (defvar swoop-window nil)
 (defvar swoop-target-buffer nil)
 (defvar swoop-target-window nil)
-(defvar swoop-target-overlay nil)
-(defvar swoop-target-overlay-within-target-window nil)
+(defvar swoop-buffer-word-overlay nil)
+(defvar swoop-target-buffer-word-overlay nil)
 
 (defvar swoop--last-position 1)
 (defvar swoop--cached-count 0)
@@ -26,6 +27,7 @@
     (define-key map (kbd "C-c C-e") 'swoop--edit)
     (define-key map (kbd "C-g") 'swoop--cancel)
     (define-key map (kbd "RET") 'swoop--default-action)
+    (define-key map (kbd "<C-return>") 'swoop--default-action)
     map))
 
 (defun swoop--cancel ()
@@ -57,6 +59,28 @@ and execute functions listed in swoop-abort-hook"
   '((t :foreground "#00eeff"))
   "Line number face for swoop"
   :group 'swoop)
+
+(defmacro swoop--mapc ($variable $list &rest $body)
+  (declare (indent 2))
+  (let (($list-unique (gensym)))
+    `(let ((,$list-unique ,$list))
+       (mapc (lambda (,$variable)
+               ,@$body)
+             ,$list-unique))))
+(defmacro swoop--mapcr ($variable $list &rest $body)
+  (declare (indent 2))
+  (let (($list-unique (gensym)))
+    `(let ((,$list-unique ,$list)
+           ($results))
+       (mapc (lambda (,$variable)
+               (setq $results (cons (progn ,@$body) $results)))
+             ,$list-unique)
+       $results)))
+;; (let ($c)
+;;   (swoop--mapc $a '(1 2 3)
+;;     (setq $c (cons (+ $a $a) $c)))
+;;   $c) ;; (6 4 2)
+;; (swoop--mapcr $a '(1 2 3) (* $a $a)) ;; (6 4 2)
 
 (defun swoop--default-action () (interactive)
   (run-with-timer
@@ -102,21 +126,21 @@ and execute functions listed in swoop-abort-hook"
 (defvar swoop-invisible-targets nil)
 (defsubst swoop--restore-unveiled-overlay ()
   (when swoop-invisible-targets
-    (mapc (lambda ($ov) (overlay-put (car $ov) 'invisible (cdr $ov)))
+    (swoop--mapc $ov (cdr $ov) (overlay-put (car $ov) 'invisible (cdr $ov)))
           swoop-invisible-targets)
-    (setq swoop-invisible-targets nil)))
+    (setq swoop-invisible-targets nil))
 (defsubst swoop--unveil-invisible-overlay ()
   "Show hidden text temporarily to view it during swoop.
-This function needs to call after latest swoop-target-overlay-within-target-window moved."
+This function needs to call after latest swoop-target-buffer-word-overlay moved."
   (swoop--restore-unveiled-overlay)
-  (mapc (lambda ($ov)
-          (let (($type (overlay-get $ov 'invisible)))
-            (when $type
-              (overlay-put $ov 'invisible nil)
-              (setq swoop-invisible-targets
-                    (cons (cons $ov $type) swoop-invisible-targets)))))
-        (overlays-in (overlay-start swoop-target-overlay-within-target-window)
-                     (overlay-end swoop-target-overlay-within-target-window))))
+  (swoop--mapc $ov
+      (overlays-in (overlay-start swoop-target-buffer-word-overlay)
+                   (overlay-end swoop-target-buffer-word-overlay))
+    (let (($type (overlay-get $ov 'invisible)))
+      (when $type
+        (overlay-put $ov 'invisible nil)
+        (setq swoop-invisible-targets
+              (cons (cons $ov $type) swoop-invisible-targets))))))
 (defsubst swoop--goto-line ($line)
   (goto-char (point-min))
   (unless (re-search-forward "\n" nil t (1- $line))
@@ -125,7 +149,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
   (with-selected-window swoop-target-window
     (swoop--goto-line $line-num)
     (move-overlay
-     swoop-target-overlay-within-target-window
+     swoop-target-buffer-word-overlay
      (point) (min (1+ (line-end-position)) (point-max)))
     (swoop--unveil-invisible-overlay)
     (recenter)))
@@ -169,7 +193,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                      (move-beginning-of-line 1))
                     (t (move-beginning-of-line 1)))))
       (move-overlay
-       swoop-target-overlay
+       swoop-buffer-word-overlay
        (point) (min (1+ (line-end-position)) (point-max)))
       (unless (or (bobp) (eobp))
         (swoop--move-line-within-target-window (line-number-at-pos)))
@@ -187,18 +211,18 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
 
 
 (defsubst swoop--buffer-selection-overlay-set ()
-  (setq swoop-target-overlay
+  (setq swoop-buffer-word-overlay
         (make-overlay (line-beginning-position)
                       (min (1+ (line-end-position)) (point-max))))
-  (overlay-put swoop-target-overlay 'face 'swoop-target-line-face)
-  (overlay-put swoop-target-overlay 'priority 15))
+  (overlay-put swoop-buffer-word-overlay 'face 'swoop-target-line-face)
+  (overlay-put swoop-buffer-word-overlay 'priority 15))
 (defsubst swoop--target-buffer-selection-overlay-set ()
-  (setq swoop-target-overlay-within-target-window
+  (setq swoop-target-buffer-word-overlay
         (make-overlay (line-beginning-position)
                       (min (1+ (line-end-position)) (point-max))))
-  (overlay-put swoop-target-overlay-within-target-window
+  (overlay-put swoop-target-buffer-word-overlay
                'face 'swoop-target-line-face)
-  (overlay-put swoop-target-overlay-within-target-window 'priority 15))
+  (overlay-put swoop-target-buffer-word-overlay 'priority 15))
 
 (global-set-key (kbd "C-o") 'swoop)
 (global-set-key (kbd "C-S-o") 'swoop-back-to-last-position)
@@ -220,7 +244,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                      ))
       (funcall swoop-display-function swoop-buffer)
       (erase-buffer)
-      (font-lock-mode 0)
+      (font-lock-mode 1) ;; for hi-lock
       (setq $bufcont (swoop--modify-buffer-content $bufcont))
       (insert $bufcont)
       ;; (linum-mode 1)
@@ -263,21 +287,26 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
     ;; (if current-prefix-arg
     (swoop--core :$query (or $query (swoop--pre-input)))))
 
+(defun my-delete/clear-all-highlight-lock ()
+  (interactive)
+  (swoop--mapc $hi hi-lock-interactive-patterns
+    (when hi-lock-interactive-patterns
+      (font-lock-remove-keywords nil (list $hi))
+      (setq hi-lock-interactive-patterns nil))
+    ;; (when font-lock-fontified (font-lock-fontify-buffer)))
+  (when font-lock-fontified (font-lock-fontify-buffer))))
 (cl-defun swoop--clear-overlay (&key $to-empty $kill)
-  (cl-flet ((swoop-clear-overlay
-             ($buf)
-             (with-current-buffer $buf
-               (mapc (lambda ($ov)
-                       (when (overlay-get $ov 'swoop-temporary)
-                         (delete-overlay $ov)))
-                     (overlays-in (point-min) (point-max))))))
-  (swoop-clear-overlay swoop-target-buffer)
+  (swoop--mapc $buf (list swoop-target-buffer swoop-buffer)
+    (with-current-buffer $buf
+      (my-delete/clear-all-highlight-lock)
+      (swoop--mapc $ov (overlays-in (point-min) (point-max))
+                 (when (overlay-get $ov 'swoop-temporary)
+                   (delete-overlay $ov))))
   (delete-overlay swoop-target-buffer-overlay)
-  (swoop-clear-overlay swoop-buffer)
   (unless $to-empty
-    (delete-overlay swoop-target-overlay-within-target-window)
+    (delete-overlay swoop-target-buffer-word-overlay)
     (unless $kill
-      (delete-overlay swoop-target-overlay)))
+      (delete-overlay swoop-buffer-word-overlay)))
   (if $kill
       (kill-buffer swoop-buffer))))
 
@@ -328,9 +357,8 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
     (when (> $length 0)
       (setq $results (car-safe $list))
       (if (> $length 1)
-          (mapc (lambda ($l)
-                  (setq $results (-intersection $results $l)))
-                (cdr $list))))
+          (swoop--mapc $l (cdr $list)
+            (setq $results (-intersection $results $l)))))
     (setq swoop--last-visible-lines $results)))
 
 
@@ -347,40 +375,43 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                     (mapconcat 'identity $query "\\|")
                     "\\)")))
     (save-excursion
-      (mapc (lambda ($q)
-              (setq $match-lines-list
-                    (cons (swoop--get-match-lines-list $q) $match-lines-list)))
-            $query)
-      (mapc (lambda ($l)
-              (swoop--goto-line $l)
-              ;; (overlay-put (make-overlay (line-beginning-position) (1+ (line-end-position)))
-              ;;              'invisible 'swoop)
-              (let* (($lbeg (line-beginning-position))
-                     ($lend (line-end-position))
-                     ($lov (make-overlay $lbeg $lend)))
-                ;; Show lines
-                (put-text-property $lbeg (min (1+ $lend) $max) 'invisible nil)
-                ;; Line number overlay
-                ;; (overlay-put $lov 'before-string
-                ;;              (propertize
-                ;;               (format $line-format $l)
-                ;;               'face '(:foreground "#ff9900")))
-                ;; (overlay-put $lov 'swoop-temporary t)
-                (block stop
-                  (while (re-search-forward $pattern $lend t)
-                    (let* (($wbeg (match-beginning 0))
-                           ($wend (match-end 0))
-                           ($ov (make-overlay $wbeg $wend)))
-                      (if swoop-halt-search-process (cl-return-from stop nil))
-                      (if (eq $wbeg $wend) (cl-return-from stop nil))
-                      (overlay-put $ov 'face 'swoop-target-words-face)
-                      (overlay-put $ov 'swoop-temporary t)
-                      (with-selected-window swoop-target-window
-                        (setq $ov (make-overlay $wbeg $wend))
-                        (overlay-put $ov 'face 'swoop-target-words-face)
-                        (overlay-put $ov 'swoop-temporary t)
-                        ))))))
-            (swoop--match-lines-list-common $match-lines-list)))))
+      (swoop--mapc $q $query
+        (setq $match-lines-list
+              (cons (swoop--get-match-lines-list $q) $match-lines-list)))
+      (swoop--mapc $l (swoop--match-lines-list-common $match-lines-list)
+        (swoop--goto-line $l)
+        ;; (overlay-put (make-overlay (line-beginning-position) (1+ (line-end-position)))
+        ;;              'invisible 'swoop)
+        (let* (($lbeg (line-beginning-position))
+               ($lend (line-end-position))
+               ($lov (make-overlay $lbeg $lend)))
+          ;; Show lines
+          (put-text-property $lbeg (min (1+ $lend) $max) 'invisible nil)
+          ;; Line number overlay
+          (overlay-put $lov 'before-string
+                       (propertize
+                        (format $line-format $l)
+                        'face '(:foreground "#ff9900")))
+          (overlay-put $lov 'swoop-temporary t)
+
+          (hi-lock-set-pattern $pattern 'swoop-target-words-face)
+          (with-selected-window swoop-target-window
+            (hi-lock-set-pattern $pattern 'swoop-target-words-face))
+          ;; (block stop
+          ;;   (while (re-search-forward $pattern $lend t)
+          ;;     (let* (($wbeg (match-beginning 0))
+          ;;            ($wend (match-end 0))
+          ;;            ($ov (make-overlay $wbeg $wend)))
+          ;;       (if (eq $wbeg $wend) (cl-return-from stop nil))
+          ;;       (if swoop-halt-search-process (cl-return-from stop nil))
+          ;;       (overlay-put $ov 'face 'swoop-target-words-face)
+          ;;       (overlay-put $ov 'swoop-temporary t)
+          ;;       (with-selected-window swoop-target-window
+          ;;         (setq $ov (make-overlay $wbeg $wend))
+          ;;         (overlay-put $ov 'face 'swoop-target-words-face)
+          ;;         (overlay-put $ov 'swoop-temporary t)
+          ;;         ))))
+          )))))
 ;; (swoop-words-overlay '("de" "sw"))
 
 ;; (swoop--get-match-lines-list "def")
@@ -394,7 +425,11 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
           (if $visible-only
               (if (not (get-text-property (point) 'invisible))
                   (setq $match-lines (cons (line-number-at-pos) $match-lines)))
-            (setq $match-lines (cons (line-number-at-pos) $match-lines)))
+            (setq $match-lines (cons
+                                (if (bolp)
+                                    (1- (line-number-at-pos)) ;; end of return match
+                                  (line-number-at-pos))
+                                $match-lines)))
           (forward-line 1)
           (if swoop-halt-search-process (cl-return-from stop nil))
           (if (eq $pos (setq $pos (re-search-forward $query nil t)))
@@ -407,12 +442,9 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
 ;; ^\s*\w \d{2,3}
 ;; (swoop--pcre-convert (read-string "Input \"^\\s*\\w \\d{2,3}\" : "))
 (defsubst swoop--pcre-convert ($query)
-  (let ($results)
-    (mapc (lambda ($q)
-            (setq $results (cons (rxt-pcre-to-elisp $q) $results)))
-          (split-string $query " " t))
-    (nreverse $results)))
-
+  (nreverse
+   (swoop--mapcr $q (split-string $query " " t)
+     (rxt-pcre-to-elisp $q))))
 ;; (swoop--migemo-convert "kaki kuke")
 ;; (swoop--migemo-convert "kakuku")
 
@@ -420,17 +452,12 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
 (defvar swoop-use-migemo nil)
 (defvar swoop-migemo-options "-q -e -d /usr/local/share/migemo/utf-8/migemo-dict")
 (defsubst swoop--migemo-convert ($query)
-  (let ($results)
-    (mapc (lambda ($q)
-            (setq $results
-                  (cons
-                   (replace-regexp-in-string
-                    "\n" ""
-                    (shell-command-to-string
-                     (concat "cmigemo" " -w " $q " " swoop-migemo-options)))
-                   $results)))
-          (split-string $query " " t))
-    (nreverse $results)))
+  (nreverse
+   (swoop--mapcr $q (split-string $query " " t)
+     (replace-regexp-in-string
+      "\n" ""
+      (shell-command-to-string
+       (concat "cmigemo" " -w " $q " " swoop-migemo-options))))))
 
 (defvar swoop-input-dilay 0.20)
 (defvar swoop-input-threshold 2)
@@ -482,9 +509,17 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
 ;; ----------------------------------------------------------------------
 
 (setq swoop-edit-map
-      (let (($map (make-sparse-keymap)))
-        ;; (define-key $map (kbd "C-x C-s") 'swoop--edit-apply-changes)
-        $map))
+  (let (($map (make-sparse-keymap)))
+    ;; (define-key $map (kbd "C-x C-s") 'swoop--edit-apply-changes)
+    (define-key $map (kbd "C-x C-s") 'swoop--edit-finish)
+    (define-key $map (kbd "C-c C-c") 'swoop--edit-finish)
+    $map))
+(defvar swoop-edit-buffer "*Swoop Edit*")
+
+(defun swoop--edit-finish ()
+  (interactive)
+  (select-window swoop-target-window)
+  (kill-buffer swoop-edit-buffer))
 
 (defun swoop--modify-buffer-content ($bufcont)
   (propertize
@@ -494,15 +529,12 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
      (goto-char (point-min))
      (add-text-properties
       (point) (line-end-position)
-      `(swoop-line-num ,(line-number-at-pos)
-                       swoop-target t))
+      `(swoop-line-num ,(line-number-at-pos) swoop-target t))
      (while (re-search-forward "\n" nil t)
        (add-text-properties
         (point) (line-end-position)
-        `(swoop-line-num ,(line-number-at-pos)
-                         swoop-target t)))
+        `(swoop-line-num ,(line-number-at-pos) swoop-target t)))
      (buffer-substring (point-min) (point-max)))
-   ;;$bufcont
    'face '(:height 0.9)))
 
 ;; (swoop--line-beg-point 400)
@@ -548,7 +580,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
           ($max-line-digit
            (length (number-to-string (line-number-at-pos (point-max))))))
       (save-excursion
-        (mapc (lambda ($l)
+        (swoop--mapc $l $visible-lines
                 (swoop--goto-line $l)
                 (setq $results
                       (cons
@@ -565,8 +597,7 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
                          'rear-nonsticky t)
                         (buffer-substring
                          (line-beginning-position) (line-end-position)))
-                       $results)))
-              $visible-lines))
+                       $results))))
       $results)))
 ;;(swoop--get-match-line-content (current-buffer) swoop--last-visible-lines)
 (defun swoop--edit-insert-lines ($buf $visible-lines)
@@ -582,9 +613,10 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
     (run-with-timer
      0 nil
      (lambda ($bufcont $bufname $bufwindow $visible-lines)
-       (funcall swoop-display-function "*Swoop Edit*")
+       (when (get-buffer swoop-edit-buffer)
+         (kill-buffer swoop-edit-buffer))
+       (funcall swoop-display-function swoop-edit-buffer)
        (erase-buffer)
-       (use-local-map swoop-edit-map)
        (set (make-local-variable 'swoop-target-buffer) $bufname)
        (set (make-local-variable 'swoop-target-window) $bufwindow)
        ;; Header
@@ -599,17 +631,16 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
        ;; Goto first editable point
        (goto-char (point-min))
        (forward-line 1)
-       (re-search-forward "^[[:space:]]*\\([0-9]+\\)::[[:space:]]" nil t)
+       ;; (re-search-forward "^[[:space:]]*\\([0-9]+\\)::[[:space:]]" nil t)
        (add-hook 'after-change-functions
-                 'swoop-after-change-function nil t))
+                 'swoop-after-change-function nil t)
+       (use-local-map swoop-edit-map))
      ;; Args
      $bufcont
      (buffer-name swoop-target-buffer)
      swoop-target-window
      swoop--last-visible-lines)
     (exit-minibuffer)))
-
-
 
 ;; ;; From replace.el
 ;; (define-derived-mode swoop-edit-mode fundamental-mode "Swoop-Edit"
@@ -630,9 +661,6 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
 ;;     (swoop-mode)
 ;;     (message "Switching to Swoop mode.")))
 
-
-;;(lookup-key swoop-map (kbd "C-n"))
-
 (defun swoop-after-change-function ($beg $end $length)
   (save-excursion
     (goto-char $beg)
@@ -645,8 +673,8 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
         (when (= $length 0)
           ;; Apply swoop-target property to inserted (e.g. yanked) text.
           (put-text-property $beg $end 'swoop-target $m)
-          ;; Did we insert a newline?  Occur Edit mode can't create new
-          ;; Occur entries; just discard everything after the newline.
+          ;; Did we insert a newline?  Swoop Edit mode can't create new
+          ;; Swoop entries; just discard everything after the newline.
           (save-excursion
             (and (re-search-forward "\n" $end t)
                  (delete-region (1- (point)) $end))))
@@ -667,18 +695,17 @@ This function needs to call after latest swoop-target-overlay-within-target-wind
           (with-selected-window $win
             (goto-char $m)
             ;; Unveil invisible block
-            (mapc (lambda ($ov)
-                    (let (($type (overlay-get $ov 'invisible)))
-                      (when $type
-                        (overlay-put $ov 'invisible nil))))
-                  (overlays-in (line-beginning-position)
-                               (line-end-position)))
+            (swoop--mapc $ov
+                (overlays-in (line-beginning-position)
+                             (line-end-position))
+              (let (($type (overlay-get $ov 'invisible)))
+                (when $type
+                  (overlay-put $ov 'invisible nil))))
             (recenter $line)
             (if $readonly
                 (message "Buffer `%s' is read only." $buf)
               (delete-region (line-beginning-position) (line-end-position))
               (insert $text))
             (move-to-column $col)))))))
-
 
 (provide 'swoop)
