@@ -34,16 +34,86 @@
     (define-key map (kbd "<C-return>") 'swoop--default-action)
     map))
 
-
-
-;; Option
+;; ----------------------------------------------------------------------
+;; Face
+(defface swoop-target-line-face
+  '((t :background "#e3e300" :foreground "#222222"))
+  "Target line face for swoop"
+  :group 'swoop)
+(defface swoop-target-words-face
+  '((t :background "#7700ff" :foreground "#ffffff"))
+  "Target words face for swoop"
+  :group 'swoop)
+(defface swoop-line-number-face
+  '((t :foreground "#00eeff"))
+  "Line number face for swoop"
+  :group 'swoop)
+;; ----------------------------------------------------------------------
+;; Macro
+(defmacro swoop--mapc ($variable $list &rest $body)
+  "Same as `mapc'"
+  (declare (indent 2))
+  (let (($list-unique (cl-gensym)))
+    `(let ((,$list-unique ,$list))
+       (mapc (lambda (,$variable)
+               ,@$body)
+             ,$list-unique))))
+(defmacro swoop--mapcr ($variable $list &rest $body)
+  "Same as `mapcar'"
+  (declare (indent 2))
+  (let (($list-unique (cl-gensym)))
+    `(let ((,$list-unique ,$list)
+           ($results))
+       (mapc (lambda (,$variable)
+               (setq $results (cons (progn ,@$body) $results)))
+             ,$list-unique)
+       $results)))
+;; ----------------------------------------------------------------------
+;; Font size change
 (defcustom swoop-font-size-change: 0.9
   "Change fontsize temporarily during swoop."
   :group 'swoop :type 'number)
 (defcustom swoop-use-target-magnifier nil
   "Magnify around target line font size"
   :group 'swoop :type 'boolean)
-
+(defvar swoop-magnify-around-target-overlay nil)
+(cl-defun swoop--magnify-around-target (&key ($around 10) ($size 1.2) $delete)
+  (with-selected-window swoop-target-window
+    (cond ((not swoop-magnify-around-target-overlay)
+           (setq swoop-magnify-around-target-overlay
+                 (make-overlay
+                  (line-beginning-position (- 0 $around))
+                  (line-beginning-position $around)))
+           (overlay-put swoop-magnify-around-target-overlay
+                        'face `(:height ,$size))
+           (overlay-put swoop-magnify-around-target-overlay
+                        'priority 100))
+          ((and $delete swoop-magnify-around-target-overlay)
+           (delete-overlay swoop-magnify-around-target-overlay))
+          (t
+           (move-overlay
+            swoop-magnify-around-target-overlay
+            (line-beginning-position (- 0 $around))
+            (line-beginning-position $around))))))
+;; ----------------------------------------------------------------------
+;; Window configuration
+(defcustom swoop-window-split-current-window nil
+ "Split window when having multiple windows open"
+ :group 'swoop :type 'boolean)
+(defcustom swoop-window-split-direction 'split-window-vertically
+ "Split window direction"
+ :type '(choice (const :tag "vertically"   split-window-vertically)
+                (const :tag "horizontally" split-window-horizontally))
+ :group 'swoop)
+(defvar swoop-display-function
+  (lambda ($buf)
+    (if swoop-window-split-current-window
+        (funcall swoop-window-split-direction)
+      (when (one-window-p)
+        (funcall swoop-window-split-direction)))
+    (other-window 1)
+    (switch-to-buffer $buf)))
+;; ----------------------------------------------------------------------
 ;; Cancel action
 (defvar swoop-abort-hook nil)
 (defun swoop--cancel ()
@@ -73,41 +143,8 @@ and execute functions listed in swoop-abort-hook"
     (overlay-put $lov2 'face 'swoop-target-line-face)))
 (add-hook 'swoop-abort-hook 'swoop-back-to-last-position)
 (add-hook 'swoop-abort-hook 'swoop--highlight-for-cancel)
-
-(defface swoop-target-line-face
-  '((t :background "#e3e300" :foreground "#222222"))
-  "Target line face for swoop"
-  :group 'swoop)
-(defface swoop-target-words-face
-  '((t :background "#7700ff" :foreground "#ffffff"))
-  "Target words face for swoop"
-  :group 'swoop)
-(defface swoop-line-number-face
-  '((t :foreground "#00eeff"))
-  "Line number face for swoop"
-  :group 'swoop)
-
-(defmacro swoop--make-local-variable ($variable $val)
-  `(set (make-local-variable ',$variable) ,$val))
-(defmacro swoop--mapc ($variable $list &rest $body)
-  "Same as `mapc'"
-  (declare (indent 2))
-  (let (($list-unique (cl-gensym)))
-    `(let ((,$list-unique ,$list))
-       (mapc (lambda (,$variable)
-               ,@$body)
-             ,$list-unique))))
-(defmacro swoop--mapcr ($variable $list &rest $body)
-  "Same as `mapcar'"
-  (declare (indent 2))
-  (let (($list-unique (cl-gensym)))
-    `(let ((,$list-unique ,$list)
-           ($results))
-       (mapc (lambda (,$variable)
-               (setq $results (cons (progn ,@$body) $results)))
-             ,$list-unique)
-       $results)))
-
+;; ----------------------------------------------------------------------
+;; Default action
 (defun swoop--default-action ()
   (interactive)
   (run-with-timer
@@ -137,19 +174,8 @@ and execute functions listed in swoop-abort-hook"
          (recenter))))
    (with-current-buffer swoop-target-buffer (point)))
   (exit-minibuffer))
-
-(defvar swoop-window-split-current-window nil)
-;; 'split-window-horizontally 'split-window-vertically
-(defvar swoop-window-split-direction 'split-window-vertically)
-(defvar swoop-display-function
-  (lambda ($buf)
-    (if swoop-window-split-current-window
-        (funcall swoop-window-split-direction)
-      (when (one-window-p)
-        (funcall swoop-window-split-direction)))
-    (other-window 1)
-    (switch-to-buffer $buf)))
-
+;; ----------------------------------------------------------------------
+;; Unveil a hidden target block of lines
 (defvar swoop-invisible-targets nil)
 (defsubst swoop--restore-unveiled-overlay ()
   (when swoop-invisible-targets
@@ -168,30 +194,12 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
         (overlay-put $ov 'invisible nil)
         (setq swoop-invisible-targets
               (cons (cons $ov $type) swoop-invisible-targets))))))
+;; ----------------------------------------------------------------------
+;; Move line up and down
 (defsubst swoop--goto-line ($line)
   (goto-char (point-min))
   (unless (re-search-forward "\n" nil t (1- $line))
     (goto-char (point-max))))
-
-(setq swoop-magnify-around-target-overlay nil)
-(cl-defun swoop--magnify-around-target (&key ($around 10) ($size 1.2) $delete)
-  (with-selected-window swoop-target-window
-    (cond ((not swoop-magnify-around-target-overlay)
-           (setq swoop-magnify-around-target-overlay
-                 (make-overlay
-                  (line-beginning-position (- 0 $around))
-                  (line-beginning-position $around)))
-           (overlay-put swoop-magnify-around-target-overlay
-                        'face `(:height ,$size))
-           (overlay-put swoop-magnify-around-target-overlay
-                        'priority 100))
-          ((and $delete swoop-magnify-around-target-overlay)
-           (delete-overlay swoop-magnify-around-target-overlay))
-          (t
-           (move-overlay
-            swoop-magnify-around-target-overlay
-            (line-beginning-position (- 0 $around))
-            (line-beginning-position $around))))))
 (defsubst swoop--move-line-within-target-window ($line-num)
   (with-selected-window swoop-target-window
     (swoop--goto-line $line-num)
@@ -242,7 +250,6 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
           (when (not (eq 'swoop (get-text-property $pos 'invisible)))
             (goto-char $pos)
             (goto-char (line-beginning-position)))))))
-
 (cl-defsubst swoop--move-line ($direction)
   (with-selected-window swoop-window
     (let ($line-num)
@@ -266,19 +273,20 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
       (unless (or (bobp) (eobp))
         (swoop--move-line-within-target-window (line-number-at-pos)))
       (recenter))))
-
 (defsubst swoop--next-line ()
   (interactive)
   (swoop--move-line 'down))
 (defsubst swoop--prev-line ()
   (interactive)
   (swoop--move-line 'up))
+;; ----------------------------------------------------------------------
+;; For update matched lines
 (defsubst swoop--invisible-on ()
   (add-to-invisibility-spec 'swoop))
 (defsubst swoop--invisible-off ()
   (remove-from-invisibility-spec 'swoop))
-
-
+;; ----------------------------------------------------------------------
+;; Selection line overlay
 (defsubst swoop--buffer-selection-overlay-set ()
   (setq swoop-buffer-selection-overlay
         (make-overlay (line-beginning-position)
@@ -292,16 +300,16 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
   (overlay-put swoop-target-buffer-selection-overlay
                'face 'swoop-target-line-face)
   (overlay-put swoop-target-buffer-selection-overlay 'priority 15))
-
-(defvar swoop-point-at-function (lambda () (thing-at-point 'symbol)))
+;; ----------------------------------------------------------------------
 (defvar swoop-target-buffer-overlay nil)
-(defvar swoop-buffer-content "")
+(defvar swoop-buffer-content)
 (cl-defun swoop--core (&key $query $resume)
-  (setq swoop--last-position (point))
-  (setq swoop-target-buffer (current-buffer))
-  (setq swoop-target-window (get-buffer-window swoop-target-buffer))
-  (setq swoop-buffer-content
-        (buffer-substring-no-properties (point-min) (point-max)))
+  (setq
+   swoop--last-position (point)
+   swoop-target-buffer  (current-buffer)
+   swoop-target-window  (get-buffer-window swoop-target-buffer)
+   swoop-buffer-content (buffer-substring-no-properties
+                         (point-min) (point-max)))
   ;; Font size change
   (setq swoop-target-buffer-overlay (make-overlay (point-min) (point-max)))
   (overlay-put swoop-target-buffer-overlay
@@ -309,12 +317,19 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
   (recenter)
   (swoop--target-buffer-selection-overlay-set)
   (save-window-excursion
-    (let* (($po (point))
-           ($pos-min (point-min)))
+    (let* (($pos-min (point-min))
+           ($bufcont swoop-buffer-content)
+           ($bufname swoop-target-buffer)
+           ($bufwin swoop-target-window)
+           ($po swoop--last-position))
       (funcall swoop-display-function swoop-buffer)
       (erase-buffer)
-      (insert (swoop--modify-buffer-content swoop-buffer-content))
       (setq swoop-window (get-buffer-window swoop-buffer))
+      (set (make-local-variable 'swoop-buffer-content) $bufcont)
+      (set (make-local-variable 'swoop-target-buffer)  $bufname)
+      (set (make-local-variable 'swoop-target-window)  $bufwin)
+      (set (make-local-variable 'swoop--last-position) $po)
+      (insert (swoop--modify-buffer-content $bufcont))
       (goto-char $po)
       (swoop--buffer-selection-overlay-set))
     (let ((buffer-invisibility-spec '(t))) ;; temporary unvail text for org-mode, or etc
@@ -340,6 +355,10 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
           (swoop--invisible-off))
         (delete-overlay swoop-target-buffer-overlay)))))
 
+(defcustom swoop-point-at-function (lambda () (thing-at-point 'symbol))
+  "Change pre input action. Default is get symbol where cursor at"
+  :group 'swoop
+  :type 'symbol)
 (defun swoop--pre-input (&optional $resume)
   (let ($results)
     (if $resume
@@ -351,6 +370,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
                            (t nil)))
       (deactivate-mark))
     $results))
+;; ----------------------------------------------------------------------
 ;;;###autoload
 (defun swoop (&optional $query)
   (interactive)
@@ -544,16 +564,14 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
 (defvar swoop--async-latest-tag nil)
 
 (cl-defun swoop-words-overlay ($query)
-  (let* (($buf (current-buffer)) ;; Must be swoop-buffer
-         ($bufcont swoop-buffer-content)
-         ($mhhatch-lines-list nil)
+  (let* (($mhhatch-lines-list nil)
          ($max (point-max))
          ($length (length $query))
          ($max-line (line-number-at-pos $max))
          ($max-line-digit (length (number-to-string $max-line)))
          ($line-format (concat "%0" (number-to-string $max-line-digit) "s: "))
          ($pattern (concat "\\(" (mapconcat 'identity $query "\\|") "\\)"))
-         ($lby 2000) ;; Divide by
+         ($lby 500) ;; Divide by
          ($ln (/ $max-line $lby)) ;; Result of division
          ($lr (% $max-line $lby)) ;; Rest of division
          ;; Number of divided parts of a buffer
@@ -569,21 +587,24 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
                `(lambda ()
                   (fundamental-mode)
                   (insert ,(substring-no-properties
-                            $bufcont
-                            (swoop--get-point-from-line (1+ (* $i $lby)))
+                            swoop-buffer-content
                             (swoop--get-point-from-line
-                             (min $max-line (* (1+ $i) $lby)))))
+                             (1+ (* $i $lby))
+                             swoop-target-buffer)
+                            (swoop--get-point-from-line
+                             (min $max-line (* (1+ $i) $lby))
+                             swoop-target-buffer)))
                   (goto-char (point-min))
                   (cons (cons ,swoop--async-latest-tag ,$dtag)
                         (funcall ,swoop--async-fn ,$q ,(* $i $lby))))
                `(lambda ($result)
-                  (when (get-buffer ,$buf)
-                    (with-current-buffer ,$buf
+                  (when (get-buffer ,swoop-buffer)
+                    (with-current-buffer ,swoop-buffer
                       (swoop--async-checker $result ,$tots ,$pattern ,$line-format)
                       )))))))
       ;; Resume hash
-      (when (get-buffer $buf)
-        (with-current-buffer $buf
+      (when (get-buffer swoop-buffer)
+        (with-current-buffer swoop-buffer
           (swoop--words-overlay $pattern $line-format))))))
 
 ;; Converter ----------------------------------------------
