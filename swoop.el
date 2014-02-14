@@ -1,8 +1,49 @@
+;;; swoop.el --- Peculiar buffer navigation for Emacs -*- coding: utf-8; lexical-binding: t -*-
+
+;; Copyright (C) 2014 by Shingo Fukuyama
+
+;; Version: Developing
+;; Author: Shingo Fukuyama - http://fukuyama.co
+;; URL: https://github.com/ShingoFukuyama/swoop
+;; Created: Feb 14 2014
+;; Keywords: swoop inner buffer search navigation
+;; Package-Requires: ((pcre2el "20130620.1810") (async "1.1") (emacs "24"))
+
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation; either version 2 of
+;; the License, or (at your option) any later version.
+
+;; This program is distributed in the hope that it will be
+;; useful, but WITHOUT ANY WARRANTY; without even the implied
+;; warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+;; PURPOSE.  See the GNU General Public License for more details.
+
+;;; Commentary:
+
+;; Developing...
+
+;; Example config
+;; ----------------------------------------------------------------
+;; ;; Require   async.el  https://github.com/jwiegley/emacs-async
+;; ;;         pcre2el.el  https://github.com/joddie/pcre2el
+;; (require 'swoop)
+;; (global-set-key (kbd "C-o")   'swoop)
+;; (global-set-key (kbd "M-o")   'swoop-pcre-regexp)
+;; (global-set-key (kbd "C-S-o") 'swoop-back-to-last-position)
+;; (global-set-key (kbd "H-6")   'swoop-migemo)
+
+;; ;; Swoop Edit Mode
+;; ;; During swoop, press [C-c C-e]
+;; ;; You can edit synchronously
+
 ;;; TODO
 ;; Unpropertize (thing-at-point 'symbol)
 ;; Eliminate flickering update effect
+;; Prevent long time loop words (], \\b, {0,} ...)
 
 ;;; Code:
+
 (require 'async)
 (require 'pcre2el)
 
@@ -33,7 +74,6 @@
     (define-key map (kbd "RET") 'swoop--default-action)
     (define-key map (kbd "<C-return>") 'swoop--default-action)
     map))
-
 ;; ----------------------------------------------------------------------
 ;; Face
 (defface swoop-target-line-face
@@ -45,7 +85,7 @@
   "Target words face for swoop"
   :group 'swoop)
 (defface swoop-line-number-face
-  '((t :foreground "#00eeff"))
+  '((t :foreground "#ff9900"))
   "Line number face for swoop"
   :group 'swoop)
 ;; ----------------------------------------------------------------------
@@ -340,7 +380,7 @@ swoop-target-buffer-selection-overlay moved."
       (set (make-local-variable 'swoop--buffer-content) $bufcont)
       (set (make-local-variable 'swoop--target-buffer)  $bufname)
       (set (make-local-variable 'swoop--target-window)  $bufwin)
-      (set (make-local-variable 'swoop--last-position) $po)
+      (set (make-local-variable 'swoop--last-position)  $po)
       (insert (swoop--modify-buffer-content $bufcont))
       (goto-char $po)
       (swoop--buffer-selection-overlay-set))
@@ -357,8 +397,6 @@ swoop-target-buffer-selection-overlay moved."
                   (swoop-update swoop--last-query-converted swoop-buffer)
                 (swoop-update (split-string $query " " t) swoop-buffer)))
             (swoop--read-from-string $query swoop-buffer))
-
-        ;; (swoop--clear-overlay)
         (when (get-buffer swoop-buffer)
           (swoop--clear-overlay :$kill t)
           (swoop--invisible-off))
@@ -489,7 +527,7 @@ swoop-target-buffer-selection-overlay moved."
       (overlay-put $lov 'before-string
                    (propertize
                     (format $line-format $l)
-                    'face '(:foreground "#ff9900")))
+                    'face 'swoop-line-number-face))
       (overlay-put $lov 'swoop-temporary t)
       ;; Words overlay
       (cl-block stop
