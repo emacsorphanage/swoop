@@ -270,7 +270,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
            ($pos-min (point-min)))
       (funcall swoop-display-function swoop-buffer)
       (erase-buffer)
-      (font-lock-mode 1) ;; for hi-lock
+      ;; (font-lock-mode 1) ;; for hi-lock
       ;; (setq swoop-buffer-content (swoop--modify-buffer-content swoop-buffer-content))
       (insert swoop-buffer-content)
       (setq swoop-window (get-buffer-window swoop-buffer))
@@ -279,10 +279,12 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
     (let ((buffer-invisibility-spec '(t))) ;; temporary unvail text for org-mode, or etc
       (unwind-protect
           (when (get-buffer swoop-target-buffer)
+            ;; Clear
             (ht-clear! swoop--async-box)
             (when $query
-              ;; First time
+              ;; Prevent following minibuffer session
               (setq swoop--minibuf-last-content $query)
+              ;; First time
               (if (listp $query)
                   (swoop-update swoop--last-query-converted swoop-buffer)
                 (swoop-update (split-string $query " " t) swoop-buffer)))
@@ -371,10 +373,9 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
 
 
 (defvar swoop--last-visible-lines nil)
-;; (swoop--match-lines-list-common '((1 2 3 4 5) (2 3 4 8) (2 3 9)))
 (defun swoop--match-lines-list-common ($match-lines-list)
   "Return common numbers list of several numbers lists.
-'((1 2 3 4 5) (2 3 4 8) (2 3 9)) -> '(2 3)"
+ (swoop--match-lines-list-common '((1 2 3 4 5) (2 3 4 8) (2 3 9))) -> '(2 3)"
   (let* (($list $match-lines-list)
          ($results)
          ($length (length $list)))
@@ -386,27 +387,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
     (setq swoop--last-visible-lines $results)))
 
 
-
-;; (swoop--get-match-lines-list "def")
-;; (cl-defun swoop--get-match-lines-list ($query &optional $visible-only)
-;;   (save-excursion
-;;     (goto-char (point-min))
-;;     (let (($po (re-search-forward $query nil t))
-;;           ($match-lines nil))
-;;       (cl-block stop
-;;         (while $po
-;;           (if $visible-only
-;;               (if (not (get-text-property (point) 'invisible))
-;;                   (setq $match-lines (cons (line-number-at-pos) $match-lines)))
-;;             (setq $match-lines (cons
-;;                                 (if (bolp)
-;;                                     (1- (line-number-at-pos)) ;; end of return match
-;;                                   (line-number-at-pos))
-;;                                 $match-lines)))
-;;           (forward-line 1)
-;;           (if (eq $po (setq $po (re-search-forward $query nil t)))
-;;               (cl-return-from stop nil))))
-;;       $match-lines)))
+;; (swoop--get-match-lines-list-async "a")
 (cl-defun swoop--get-match-lines-list-async ($query &optional $from)
   (save-excursion
     (goto-char (point-min))
@@ -430,11 +411,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
           (if (eq $po (setq $po (re-search-forward $query nil t)))
               (cl-return-from stop nil))))
       $match-lines)))
-;; (swoop--get-match-lines-list-async "a")
-
-;;(echo (nreverse (car ff)))
-
-
+(setq swoop--async-fn (byte-compile 'swoop--get-match-lines-list-async))
 
 (cl-defun swoop--words-overlay ($pattern $line-format)
   ;; Delete counting key
@@ -460,26 +437,26 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
                     'face '(:foreground "#ff9900")))
       (overlay-put $lov 'swoop-temporary t)
 
-      ;; (if nil
-      ;;     (progn
-      ;;       (hi-lock-set-pattern $pattern 'swoop-target-words-face)
-      ;;       (with-selected-window swoop-target-window
-      ;;         (hi-lock-set-pattern $pattern 'swoop-target-words-face)))
+      (if nil
+          (progn
+            (hi-lock-set-pattern $pattern 'swoop-target-words-face)
+            (with-selected-window swoop-target-window
+              (hi-lock-set-pattern $pattern 'swoop-target-words-face)))
 
-      ;;       (cl-block stop
-      ;;         (while (re-search-forward $pattern $lend t)
-      ;;           (let* (($wbeg (match-beginning 0))
-      ;;                  ($wend (match-end 0))
-      ;;                  ($ov (make-overlay $wbeg $wend)))
-      ;;             (overlay-put $ov 'face 'swoop-target-words-face)
-      ;;             (overlay-put $ov 'swoop-temporary t)
-      ;;            (overlay-put $ov 'priority 20)
-      ;;             (with-selected-window swoop-target-window
-      ;;               (setq $ov (make-overlay $wbeg $wend))
-      ;;               (overlay-put $ov 'face 'swoop-target-words-face)
-      ;;               (overlay-put $ov 'swoop-temporary t)
-      ;;               (overlay-put $ov 'priority 20))
-      ;;             ))))
+            (cl-block stop
+              (while (re-search-forward $pattern $lend t)
+                (let* (($wbeg (match-beginning 0))
+                       ($wend (match-end 0))
+                       ($ov (make-overlay $wbeg $wend)))
+                  (overlay-put $ov 'face 'swoop-target-words-face)
+                  (overlay-put $ov 'swoop-temporary t)
+                 (overlay-put $ov 'priority 20)
+                  (with-selected-window swoop-target-window
+                    (setq $ov (make-overlay $wbeg $wend))
+                    (overlay-put $ov 'face 'swoop-target-words-face)
+                    (overlay-put $ov 'swoop-temporary t)
+                    (overlay-put $ov 'priority 20))
+                  ))))
 
       ))
   (with-selected-window swoop-window
@@ -494,6 +471,12 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
           ((eobp)
            (swoop--prev-line)))
     ))
+
+(defun swoop--get-point-from-line ($line &optional $buf)
+  (or $buf (setq $buf (current-buffer)))
+  (save-excursion
+    (with-current-buffer $buf
+      (swoop--goto-line $line) (point))))
 
 (defun swoop--async-count ($result $length $pattern $line-format)
   ;; (setq a (list (caar $result) (cdar $result) (cdr $result)))
@@ -519,19 +502,14 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
               (ht-set swoop--async-box $key $match))
             (setq p (ht-items swoop--async-box))
             (if (eq $length (ht-get swoop--async-box $check-key))
-                (swoop--words-overlay $pattern $line-format)))
-          (ht-clear! swoop--async-box)))))
+                (swoop--words-overlay $pattern $line-format))))
+      ;; Abort old response
+      (ht-clear! swoop--async-box))))
 ;; (swoop--async-count (cons swoop--async-latest-tag '(9 8 7 6)) 3)
-
-(defun swoop--get-point-from-line ($line &optional $buf)
-  (or $buf (setq $buf (current-buffer)))
-  (save-excursion
-    (with-current-buffer $buf
-      (swoop--goto-line $line) (point))))
 
 (setq swoop--async-box (make-hash-table :test 'equal))
 (defvar swoop--async-latest-tag nil)
-(setq swoop--async-fn (byte-compile 'swoop--get-match-lines-list-async))
+
 (cl-defun swoop-words-overlay ($query)
   (let* (($buf (current-buffer)) ;; Must be swoop-buffer
          ($bufcont swoop-buffer-content)
@@ -546,7 +524,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
          ($pattern (concat
                     "\\(" (mapconcat 'identity $query "\\|")
                     "\\)"))
-         ($lb 1000)
+         ($lb 800)
          ($ln (/ $max-line $lb))
          ($lr (% $max-line $lb))
          ($bn (if (eq 0 $lr)
@@ -557,7 +535,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
     (setq swoop--async-latest-tag (symbol-name (cl-gensym)))
     (setq aaa (list $lb $ln $lr $bn $plength 99))
     (setq dd nil)
-    ;; (setq aaa (list (1+ (* 0 $bn)) (1+ (* (1+ 0) $lb)) $lr $bn $plength 99))
+    ;; (setq aaa (list (1+ (* 0 $bn)) (1+ (* (1+ 0) $lb)) $lr $bn $plength))
     (save-excursion
       (swoop--mapc $q $query
         (setq $tag2 (symbol-name (cl-gensym)))
@@ -647,6 +625,17 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
       (shell-command-to-string
        (concat "cmigemo" " -w " $q " " swoop-migemo-options))))))
 
+(defun swoop--convert-input ($content)
+  ;; PCRE
+  (when swoop-use-pcre
+    (setq $content (swoop--pcre-convert $content))
+    (setq swoop-use-migemo nil))
+  ;; MIGEMO
+  (when swoop-use-migemo
+    (setq $content (swoop--migemo-convert $content))
+    (setq swoop-use-pcre nil))
+  $content)
+
 (setq swoop-input-dilay 0.1)
 (setq swoop-input-threshold 2)
 (defun swoop--read-from-string ($query $buf)
@@ -654,35 +643,27 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
     (unwind-protect
         (minibuffer-with-setup-hook
             (lambda ()
-              (setq $timer
-                    (run-with-idle-timer
-                     swoop-input-dilay
-                     'repeat
-                     (lambda ()
-                       (with-selected-window (or (active-minibuffer-window)
-                                                 (minibuffer-window))
-                         (let* (($content (minibuffer-contents)))
-                           (when (and (not (equal swoop--minibuf-last-content $content))
-                                      (or
-                                       ;; When becomeing empty again
-                                       (equal "" $content)
-                                       ;; Avoid too many matching
-                                       (>= (length $content) swoop-input-threshold)))
-                             ;; Stop old async process
-                             (ht-clear! swoop--async-box)
-
-                             (setq swoop--minibuf-last-content $content)
-
-                             ;; MIGEMO
-                             (when swoop-use-migemo
-                               (setq $content (swoop--migemo-convert $content))
-                               (setq swoop-use-pcre nil))
-                             ;; PCRE
-                             (when swoop-use-pcre
-                               (setq $content (swoop--pcre-convert $content))
-                               (setq swoop-use-migemo nil))
-
-                             (swoop-update $content $buf))))))))
+              (setq
+               $timer
+               (run-with-idle-timer
+                swoop-input-dilay
+                'repeat
+                (lambda ()
+                  (with-selected-window (or (active-minibuffer-window)
+                                            (minibuffer-window))
+                    (let* (($content (minibuffer-contents)))
+                      (when (and (not (equal swoop--minibuf-last-content
+                                             $content))
+                                 (or
+                                  ;; When becomeing empty again
+                                  (equal "" $content)
+                                  ;; Avoid too many matching
+                                  (>= (length $content) swoop-input-threshold)))
+                        ;; Stop old async process
+                        (ht-clear! swoop--async-box)
+                        (setq swoop--minibuf-last-content $content)
+                        (swoop-update (swoop--convert-input $content)
+                                      $buf))))))))
           (read-from-minibuffer
            "Swoop: " (or $query "") swoop-map nil
            query-replace-from-history-variable nil t))
