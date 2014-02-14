@@ -39,7 +39,8 @@
     map))
 
 ;; Option
-(setq swoop-font-size-change 0.90)
+(setq swoop-font-size-change: 0.9)
+(setq swoop-use-target-magnifier: t)
 
 
 ;; Cancel action
@@ -172,12 +173,34 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
   (goto-char (point-min))
   (unless (re-search-forward "\n" nil t (1- $line))
     (goto-char (point-max))))
+
+(setq swoop-magnify-around-target-overlay nil)
+(cl-defun swoop--magnify-around-target (&key ($around 10) ($size 1.2) $delete)
+  (with-selected-window swoop-target-window
+    (cond ((not swoop-magnify-around-target-overlay)
+           (setq swoop-magnify-around-target-overlay
+                 (make-overlay
+                  (line-beginning-position (- 0 $around))
+                  (line-beginning-position $around)))
+           (overlay-put swoop-magnify-around-target-overlay
+                        'face `(:height ,$size))
+           (overlay-put swoop-magnify-around-target-overlay
+                        'priority 100))
+          ((and $delete swoop-magnify-around-target-overlay)
+           (delete-overlay swoop-magnify-around-target-overlay))
+          (t
+           (move-overlay
+            swoop-magnify-around-target-overlay
+            (line-beginning-position (- 0 $around))
+            (line-beginning-position $around))))))
 (defsubst swoop--move-line-within-target-window ($line-num)
   (with-selected-window swoop-target-window
     (swoop--goto-line $line-num)
     (move-overlay
      swoop-target-buffer-selection-overlay
      (point) (min (1+ (line-end-position)) (point-max)))
+    (if swoop-use-target-magnifier:
+        (swoop--magnify-around-target))
     (swoop--unveil-invisible-overlay)
     (recenter)))
 (defsubst swoop--boblp (&optional $point)
@@ -283,14 +306,14 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
   ;; Font size change
   (setq swoop-target-buffer-overlay (make-overlay (point-min) (point-max)))
   (overlay-put swoop-target-buffer-overlay
-               'face `(:height ,swoop-font-size-change))
+               'face `(:height ,swoop-font-size-change:))
   (recenter)
   (swoop--target-buffer-selection-overlay-set)
   (save-window-excursion
     (let* (($po (point))
            ($pos-min (point-min)))
       (funcall swoop-display-function swoop-buffer)
-      (erase-buffer)
+      ;; (erase-buffer)
       ;; (font-lock-mode 1) ;; for hi-lock
       (insert (swoop--modify-buffer-content swoop-buffer-content))
       (setq swoop-window (get-buffer-window swoop-buffer))
@@ -298,30 +321,37 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
       (swoop--buffer-selection-overlay-set))
     (let ((buffer-invisibility-spec '(t))) ;; temporary unvail text for org-mode, or etc
       (unwind-protect
-          (when (get-buffer swoop-target-buffer)
-            ;; Clear
-            (ht-clear! swoop--async-box)
-            (when $query
+          (when (get-buffer swoop-buffer)
+            (unless $resume
+              (ht-clear! swoop--async-box))
+            (when (or $query $resume)
               ;; Prevent following minibuffer session
               (setq swoop--minibuf-last-content $query)
+              (setq swoop--minibuffer-default-input $query)
               ;; First time
               (if (or (listp $query) $resume)
                   (swoop-update swoop--last-query-converted swoop-buffer)
                 (swoop-update (split-string $query " " t) swoop-buffer)))
-            (swoop--read-from-string $query swoop-buffer))
-        (swoop--clear-overlay :$kill t)
-        ;; (swoop--clear-overlay)
-        (delete-overlay swoop-target-buffer-overlay)
-        (swoop--invisible-off)))))
+            (swoop--read-from-string $query swoop-buffer)
+            ;; (setq swoop--minibuffer-default-input nil)
+            )
 
-(defun swoop--pre-input ()
+        ;; (swoop--clear-overlay)
+        (when (get-buffer swoop-buffer)
+          (swoop--clear-overlay :$kill t)
+          (swoop--invisible-off))
+        (delete-overlay swoop-target-buffer-overlay)))))
+
+(defun swoop--pre-input (&optional $resume)
   (let ($results)
-    (setq $results (cond (mark-active
-                          (buffer-substring-no-properties
-                           (region-beginning) (region-end)))
-                         ((funcall swoop-point-at-function))
-                         (t nil)))
-    (deactivate-mark)
+    (if $resume
+        (setq $results swoop--last-query-plain)
+      (setq $results (cond (mark-active
+                            (buffer-substring-no-properties
+                             (region-beginning) (region-end)))
+                           ((funcall swoop-point-at-function))
+                           (t nil)))
+      (deactivate-mark))
     $results))
 ;;;###autoload
 (defun swoop (&optional $query)
@@ -360,6 +390,8 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
         (swoop--mapc $ov (overlays-in (point-min) (point-max))
           (when (overlay-get $ov 'swoop-temporary)
             (delete-overlay $ov))))))
+  (if swoop-use-target-magnifier:
+      (swoop--magnify-around-target :$delete t))
   (unless $to-empty
     (delete-overlay swoop-target-buffer-selection-overlay)
     (unless $kill
@@ -522,9 +554,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
               (ht-set swoop--async-box $key $match))
             (setq p (ht-items swoop--async-box))
             (if (eq $length (ht-get swoop--async-box $check-key))
-                (swoop--words-overlay $pattern $line-format))))
-      ;; Abort old response
-      (ht-clear! swoop--async-box))))
+                (swoop--words-overlay $pattern $line-format)))))))
 ;; (swoop--async-count (cons swoop--async-latest-tag '(9 8 7 6)) 3)
 
 (setq swoop--async-box (make-hash-table :test 'equal))
@@ -556,34 +586,36 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
     (setq aaa (list $lb $ln $lr $bn $plength 99))
     (setq dd nil)
     ;; (setq aaa (list (1+ (* 0 $bn)) (1+ (* (1+ 0) $lb)) $lr $bn $plength))
-    (save-excursion
-      (swoop--mapc $q $query
-        (setq $tag2 (symbol-name (cl-gensym)))
-        (cl-dotimes ($i $bn)
-          (setq dd
-                (cons (list (1+ (* $i $lb)) (min $max-line (* (1+ $i) $lb)))
-                      dd))
-          ;; (setq aaa (list (1+ (* $i $lb)) (* (1+ $i) $lb) $lr $bn $plength 99))
-          (async-start
-           `(lambda ()
-              (fundamental-mode)
-              (insert ,(substring-no-properties
-                        $bufcont
-                        (swoop--get-point-from-line (1+ (* $i $lb)))
-                        (swoop--get-point-from-line
-                                    (min $max-line (* (1+ $i) $lb)))))
-              (goto-char (point-min))
-              (cons (cons ,swoop--async-latest-tag ,$tag2)
-                    (funcall ,swoop--async-fn ,$q ,(* $i $lb))))
-           `(lambda ($result)
-              (when (get-buffer ,$buf)
-                (with-current-buffer ,$buf
-                  (swoop--async-count $result ,$plength ,$pattern ,$line-format)
-                  ))
-              ))
-          )
-        ))
-    ))
+    (if (ht-empty? swoop--async-box)
+        (save-excursion
+          (swoop--mapc $q $query
+            (setq $tag2 (symbol-name (cl-gensym)))
+            (cl-dotimes ($i $bn)
+              (setq dd
+                    (cons (list (1+ (* $i $lb)) (min $max-line (* (1+ $i) $lb)))
+                          dd))
+              ;; (setq aaa (list (1+ (* $i $lb)) (* (1+ $i) $lb) $lr $bn $plength 99))
+              (async-start
+               `(lambda ()
+                  (fundamental-mode)
+                  (insert ,(substring-no-properties
+                            $bufcont
+                            (swoop--get-point-from-line (1+ (* $i $lb)))
+                            (swoop--get-point-from-line
+                             (min $max-line (* (1+ $i) $lb)))))
+                  (goto-char (point-min))
+                  (cons (cons ,swoop--async-latest-tag ,$tag2)
+                        (funcall ,swoop--async-fn ,$q ,(* $i $lb))))
+               `(lambda ($result)
+                  (when (get-buffer ,$buf)
+                    (with-current-buffer ,$buf
+                      (swoop--async-count $result ,$plength ,$pattern ,$line-format)
+                      ))
+                  )))))
+      ;; Resume hash
+      (when (get-buffer $buf)
+        (with-current-buffer $buf
+          (swoop--words-overlay $pattern $line-format))))))
 
 
 ;; \w{2,3}.html?$
@@ -621,6 +653,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
     (setq $input (swoop--migemo-convert $input))))
   $input)
 
+(setq swoop--minibuffer-default-input nil)
 (setq swoop-input-dilay 0.1)
 (setq swoop-input-threshold 2)
 (defun swoop--read-from-string ($query $buf)
@@ -651,7 +684,8 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
                                       $buf))))))))
           (read-from-minibuffer
            "Swoop: " (or $query "") swoop-map nil
-           query-replace-from-history-variable nil t))
+           query-replace-from-history-variable
+           swoop--minibuffer-default-input t))
       (when $timer (cancel-timer $timer) (setq $timer nil))
       (setq swoop--last-query-plain swoop--minibuf-last-content)
       (setq swoop--minibuf-last-content "")
