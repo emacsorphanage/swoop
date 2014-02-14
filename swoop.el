@@ -73,7 +73,7 @@
 (defcustom swoop-font-size-change: 0.9
   "Change fontsize temporarily during swoop."
   :group 'swoop :type 'number)
-(defcustom swoop-use-target-magnifier nil
+(defcustom swoop-use-target-magnifier: nil
   "Magnify around target line font size"
   :group 'swoop :type 'boolean)
 (defvar swoop-magnify-around-target-overlay nil)
@@ -227,9 +227,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
               ($pos (point)))
           (save-excursion
             (while (progn
-                     (or (setq $pos (next-single-property-change
-                                     $pos 'invisible))
-                     (setq $pos (re-search-forward "\n.+$" nil t)))
+                     (setq $pos (re-search-forward "\n.+$" nil t))
                      (and (eq 'swoop (get-text-property $pos 'invisible))
                           (not (swoop--eoblp $pos))))))
           (when (not (eq 'swoop (get-text-property $pos 'invisible)))
@@ -242,9 +240,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
               ($pos (point)))
           (save-excursion
             (while (progn
-                     (or (setq $pos (previous-single-property-change
-                                    $pos 'invisible))
-                     (setq $pos (re-search-backward "\n" nil t)))
+                     (setq $pos (re-search-backward "\n" nil t))
                      (and (eq 'swoop (get-text-property $pos 'invisible))
                           (not (swoop--boblp $pos))))))
           (when (not (eq 'swoop (get-text-property $pos 'invisible)))
@@ -396,7 +392,6 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
   (swoop--mapc $buf (list swoop-target-buffer swoop-buffer)
     (when (get-buffer swoop-buffer)
       (with-current-buffer $buf
-        (my-delete/clear-all-highlight-lock)
         (swoop--mapc $ov (overlays-in (point-min) (point-max))
           (when (overlay-get $ov 'swoop-temporary)
             (delete-overlay $ov))))))
@@ -571,7 +566,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
          ($max-line-digit (length (number-to-string $max-line)))
          ($line-format (concat "%0" (number-to-string $max-line-digit) "s: "))
          ($pattern (concat "\\(" (mapconcat 'identity $query "\\|") "\\)"))
-         ($lby 500) ;; Divide by
+         ($lby 800) ;; Buffer divide by
          ($ln (/ $max-line $lby)) ;; Result of division
          ($lr (% $max-line $lby)) ;; Rest of division
          ;; Number of divided parts of a buffer
