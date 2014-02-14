@@ -5,8 +5,6 @@
 
 
 ;;; Code
-(require 'dash)
-(require 'hi-lock)
 (require 'ht)
 (require 'async)
 ;; (my-nest-specific-text-property-position 'invisible 'swoop)
@@ -40,7 +38,7 @@
 
 ;; Option
 (setq swoop-font-size-change: 0.9)
-(setq swoop-use-target-magnifier: t)
+(setq swoop-use-target-magnifier: nil)
 
 
 ;; Cancel action
@@ -313,8 +311,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
     (let* (($po (point))
            ($pos-min (point-min)))
       (funcall swoop-display-function swoop-buffer)
-      ;; (erase-buffer)
-      ;; (font-lock-mode 1) ;; for hi-lock
+      (erase-buffer)
       (insert (swoop--modify-buffer-content swoop-buffer-content))
       (setq swoop-window (get-buffer-window swoop-buffer))
       (goto-char $po)
@@ -374,14 +371,6 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
         (swoop--core :$resume t)
       (swoop--core :$query (or $query (swoop--pre-input))))))
 
-(defun my-delete/clear-all-highlight-lock ()
-  (interactive)
-  (swoop--mapc $hi hi-lock-interactive-patterns
-    (when hi-lock-interactive-patterns
-      (font-lock-remove-keywords nil (list $hi))
-      (setq hi-lock-interactive-patterns nil))
-    ;; (when font-lock-fontified (font-lock-fontify-buffer)))
-  (when font-lock-fontified (font-lock-fontify-buffer))))
 (cl-defun swoop--clear-overlay (&key $to-empty $kill)
   (swoop--mapc $buf (list swoop-target-buffer swoop-buffer)
     (when (get-buffer swoop-buffer)
@@ -426,6 +415,16 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
               (swoop--move-line 'init)))))))
 
 
+(defsubst swoop--make-same-element-list ($list1 $list2)
+  (let ($result)
+    (let (($nth 0))
+      (while $list1
+        (let (($top (car $list1)))
+          (when (memq $top $list2)
+            (setq $result (cons $top $result))))
+        (setq $nth (1+ $nth))
+        (setq $list1 (cdr $list1))))
+    (nreverse $result)))
 (defvar swoop--last-visible-lines nil)
 (defun swoop--match-lines-list-common ($match-lines-list)
   "Return common numbers list of several numbers lists.
@@ -437,7 +436,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
       (setq $results (car-safe $list))
       (if (> $length 1)
           (swoop--mapc $l (cdr $list)
-            (setq $results (-intersection $results $l)))))
+            (setq $results (swoop--make-same-element-list $results $l)))))
     (setq swoop--last-visible-lines $results)))
 
 
@@ -487,26 +486,20 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
                     'face '(:foreground "#ff9900")))
       (overlay-put $lov 'swoop-temporary t)
 
-      (if nil
-          (progn
-            (hi-lock-set-pattern $pattern 'swoop-target-words-face)
+      (cl-block stop
+        (while (re-search-forward $pattern $lend t)
+          (let* (($wbeg (match-beginning 0))
+                 ($wend (match-end 0))
+                 ($ov (make-overlay $wbeg $wend)))
+            (overlay-put $ov 'face 'swoop-target-words-face)
+            (overlay-put $ov 'swoop-temporary t)
+            (overlay-put $ov 'priority 20)
             (with-selected-window swoop-target-window
-              (hi-lock-set-pattern $pattern 'swoop-target-words-face)))
-
-            (cl-block stop
-              (while (re-search-forward $pattern $lend t)
-                (let* (($wbeg (match-beginning 0))
-                       ($wend (match-end 0))
-                       ($ov (make-overlay $wbeg $wend)))
-                  (overlay-put $ov 'face 'swoop-target-words-face)
-                  (overlay-put $ov 'swoop-temporary t)
-                 (overlay-put $ov 'priority 20)
-                  (with-selected-window swoop-target-window
-                    (setq $ov (make-overlay $wbeg $wend))
-                    (overlay-put $ov 'face 'swoop-target-words-face)
-                    (overlay-put $ov 'swoop-temporary t)
-                    (overlay-put $ov 'priority 20))
-                  ))))
+              (setq $ov (make-overlay $wbeg $wend))
+              (overlay-put $ov 'face 'swoop-target-words-face)
+              (overlay-put $ov 'swoop-temporary t)
+              (overlay-put $ov 'priority 20))
+            )))
 
       ))
   (with-selected-window swoop-window
@@ -574,7 +567,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
          ($pattern (concat
                     "\\(" (mapconcat 'identity $query "\\|")
                     "\\)"))
-         ($lb 300)
+         ($lb 3000)
          ($ln (/ $max-line $lb))
          ($lr (% $max-line $lb))
          ($bn (if (eq 0 $lr)
