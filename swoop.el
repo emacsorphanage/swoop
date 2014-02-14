@@ -460,22 +460,26 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
                     'face '(:foreground "#ff9900")))
       (overlay-put $lov 'swoop-temporary t)
 
-      ;; (hi-lock-set-pattern $pattern 'swoop-target-words-face)
-      ;; (with-selected-window swoop-target-window
-      ;;   (hi-lock-set-pattern $pattern 'swoop-target-words-face))
+      ;; (if nil
+      ;;     (progn
+      ;;       (hi-lock-set-pattern $pattern 'swoop-target-words-face)
+      ;;       (with-selected-window swoop-target-window
+      ;;         (hi-lock-set-pattern $pattern 'swoop-target-words-face)))
 
-      (cl-block stop
-        (while (re-search-forward $pattern $lend t)
-          (let* (($wbeg (match-beginning 0))
-                 ($wend (match-end 0))
-                 ($ov (make-overlay $wbeg $wend)))
-            (overlay-put $ov 'face 'swoop-target-words-face)
-            (overlay-put $ov 'swoop-temporary t)
-            (with-selected-window swoop-target-window
-              (setq $ov (make-overlay $wbeg $wend))
-              (overlay-put $ov 'face 'swoop-target-words-face)
-              (overlay-put $ov 'swoop-temporary t))
-            )))
+      ;;       (cl-block stop
+      ;;         (while (re-search-forward $pattern $lend t)
+      ;;           (let* (($wbeg (match-beginning 0))
+      ;;                  ($wend (match-end 0))
+      ;;                  ($ov (make-overlay $wbeg $wend)))
+      ;;             (overlay-put $ov 'face 'swoop-target-words-face)
+      ;;             (overlay-put $ov 'swoop-temporary t)
+      ;;            (overlay-put $ov 'priority 20)
+      ;;             (with-selected-window swoop-target-window
+      ;;               (setq $ov (make-overlay $wbeg $wend))
+      ;;               (overlay-put $ov 'face 'swoop-target-words-face)
+      ;;               (overlay-put $ov 'swoop-temporary t)
+      ;;               (overlay-put $ov 'priority 20))
+      ;;             ))))
 
       ))
   (with-selected-window swoop-window
@@ -492,31 +496,31 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
     ))
 
 (defun swoop--async-count ($result $length $pattern $line-format)
-  (setq a (list (caar $result) (cdar $result) (cdr $result)))
-  (setq b (list $length $pattern $line-format))
-  (let* ( ;;($tag (car $result))
-         ($check-key (caar $result))
-         ($key (cdar $result))
-         ($match (cdr $result)))
+  ;; (setq a (list (caar $result) (cdar $result) (cdr $result)))
+  ;; (setq b (list $length $pattern $line-format))
+  (let* (($tag (car $result))
+         ($check-key (car $tag)))
     (if (equal swoop--async-latest-tag $check-key)
-        (progn
-          (if (ht-contains? swoop--async-box $check-key)
-              (ht-set swoop--async-box
-                      $check-key
-                      (1+ (ht-get swoop--async-box $check-key)))
-            (ht-set swoop--async-box $check-key 1))
-          (if (ht-contains? swoop--async-box $key)
-              ;; Add results if the same $key already exists
-              (ht-set swoop--async-box
-                      $key
-                      (append
-                       (ht-get swoop--async-box $key)
-                       $match))
-            (ht-set swoop--async-box $key $match))
-          (setq p (ht-items swoop--async-box))
-          (if (eq $length (ht-get swoop--async-box $check-key))
-              (swoop--words-overlay $pattern $line-format)))
-      (ht-clear! swoop--async-box))))
+        (let (($key (cdr $tag))
+              ($match (cdr $result)))
+          (progn
+            (if (ht-contains? swoop--async-box $check-key)
+                (ht-set swoop--async-box
+                        $check-key
+                        (1+ (ht-get swoop--async-box $check-key)))
+              (ht-set swoop--async-box $check-key 1))
+            (if (ht-contains? swoop--async-box $key)
+                ;; Add results if the same $key already exists
+                (ht-set swoop--async-box
+                        $key
+                        (append
+                         (ht-get swoop--async-box $key)
+                         $match))
+              (ht-set swoop--async-box $key $match))
+            (setq p (ht-items swoop--async-box))
+            (if (eq $length (ht-get swoop--async-box $check-key))
+                (swoop--words-overlay $pattern $line-format)))
+          (ht-clear! swoop--async-box)))))
 ;; (swoop--async-count (cons swoop--async-latest-tag '(9 8 7 6)) 3)
 
 (defun swoop--get-point-from-line ($line &optional $buf)
@@ -530,7 +534,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
 (setq swoop--async-fn (byte-compile 'swoop--get-match-lines-list-async))
 (cl-defun swoop-words-overlay ($query)
   (let* (($buf (current-buffer)) ;; Must be swoop-buffer
-         ($bufcont (buffer-substring-no-properties (point-min) (point-max)))
+         ($bufcont swoop-buffer-content)
          ($mhhatch-lines-list nil)
          ($max (point-max))
          ($length (length $query))
@@ -542,7 +546,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
          ($pattern (concat
                     "\\(" (mapconcat 'identity $query "\\|")
                     "\\)"))
-         ($lb 300)
+         ($lb 1000)
          ($ln (/ $max-line $lb))
          ($lr (% $max-line $lb))
          ($bn (if (eq 0 $lr)
@@ -643,8 +647,8 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
       (shell-command-to-string
        (concat "cmigemo" " -w " $q " " swoop-migemo-options))))))
 
-(defvar swoop-input-dilay 0)
-(setq swoop-input-threshold 0)
+(setq swoop-input-dilay 0.1)
+(setq swoop-input-threshold 2)
 (defun swoop--read-from-string ($query $buf)
   (let (($timer nil))
     (unwind-protect
@@ -892,17 +896,18 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
 ;;; swoop.el ends here
 
 
-;; (setq fi 99)
-;; (async-start
-;;  `(lambda ()
-;;     ;; (insert ,(buffer-substring-no-properties (point-min) (point-max)))
-;;     ;; (goto-char (point-min))
-;;     ;; (funcall ,swoop--async-fn "a")
-;;     (insert "aaa")
-;;     (princ major-mode))
-;;  `(lambda (result)
-;;     (princ (cons (type-of result) result))
-;;     ))
+(setq fi 99)
+(async-start
+ `(lambda ()
+    ;; (insert ,(buffer-substring-no-properties (point-min) (point-max)))
+    ;; (goto-char (point-min))
+    ;; (funcall ,swoop--async-fn "a")
+    (insert "aaa")
+    (setq ttt (make-hash-table :test 'equal))
+    )
+ `(lambda (result)
+    (princ (cons (type-of result) result))
+    ))
 
 ;;aaaa
 ;; (setq ppp (buffer-substring-no-properties (line-beginning-position 1) (line-end-position)))
