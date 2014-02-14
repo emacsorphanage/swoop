@@ -5,7 +5,6 @@
 
 
 ;;; Code
-(require 'ht)
 (require 'async)
 ;; (my-nest-specific-text-property-position 'invisible 'swoop)
 ;; buffer-invisibility-spec
@@ -527,20 +526,16 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
         (let (($key (cdr $tag))
               ($match (cdr $result)))
           (progn
-            (if (ht-contains? swoop--async-pool $check-key)
-                (puthash $check-key
-                         (1+ (gethash $check-key swoop--async-pool))
-                         swoop--async-pool)
-              (puthash $check-key 1 swoop--async-pool))
-            (if (ht-contains? swoop--async-pool $key)
-                ;; Add results if the same $key already exists
-                (puthash $key
-                        (append
-                         (gethash $key swoop--async-pool)
-                         $match)
-                        swoop--async-pool)
-              (puthash $key $match swoop--async-pool))
-            (if (eq $length (ht-get swoop--async-pool $check-key))
+            (let (($v (gethash $check-key swoop--async-pool)))
+              (if $v
+                  (puthash $check-key (1+ $v) swoop--async-pool)
+                (puthash $check-key 1 swoop--async-pool)))
+            (let (($v (gethash $key swoop--async-pool)))
+              (if $v
+                  ;; Add results if the same $key already exists
+                  (puthash $key (append $v $match) swoop--async-pool)
+                (puthash $key $match swoop--async-pool)))
+            (if (eq $length (gethash $check-key swoop--async-pool))
                 (swoop--words-overlay $pattern $line-format)))))))
 
 (setq swoop--async-pool (make-hash-table :test 'equal))
@@ -563,7 +558,7 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
          ($bn (if (eq 0 $lr) $ln (1+ $ln)))
          ($tots (* $bn $length)) ;; Total session
          ($dtag))
-    (if (zerop (ht-size swoop--async-pool))
+    (if (zerop (hash-table-count swoop--async-pool))
         (save-excursion
           (swoop--mapc $q $query
             (setq $dtag (symbol-name (cl-gensym)))
