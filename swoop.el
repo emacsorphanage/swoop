@@ -74,7 +74,7 @@
     (define-key map (kbd "RET") 'swoop--default-action)
     (define-key map (kbd "<C-return>") 'swoop--default-action)
     map))
-;; ----------------------------------------------------------------------
+
 ;; Face
 (defface swoop-target-line-face
   '((t :background "#e3e300" :foreground "#222222"))
@@ -88,7 +88,7 @@
   '((t :foreground "#ff9900"))
   "Line number face for swoop"
   :group 'swoop)
-;; ----------------------------------------------------------------------
+
 ;; Macro
 (defmacro swoop--mapc ($variable $list &rest $body)
   "Same as `mapc'"
@@ -108,7 +108,7 @@
                (setq $results (cons (progn ,@$body) $results)))
              ,$list-unique)
        $results)))
-;; ----------------------------------------------------------------------
+
 ;; Font size change
 (defcustom swoop-font-size-change: 0.9
   "Change fontsize temporarily during swoop."
@@ -135,7 +135,7 @@
             swoop-magnify-around-target-overlay
             (line-beginning-position (- 0 $around))
             (line-beginning-position $around))))))
-;; ----------------------------------------------------------------------
+
 ;; Window configuration
 (defcustom swoop-window-split-current-window nil
  "Split window when having multiple windows open"
@@ -153,7 +153,7 @@
         (funcall swoop-window-split-direction)))
     (other-window 1)
     (switch-to-buffer $buf)))
-;; ----------------------------------------------------------------------
+
 ;; Cancel action
 (defvar swoop-abort-hook nil)
 (defun swoop--cancel ()
@@ -183,7 +183,7 @@ and execute functions listed in swoop-abort-hook"
     (overlay-put $lov2 'face 'swoop-target-line-face)))
 (add-hook 'swoop-abort-hook 'swoop-back-to-last-position)
 (add-hook 'swoop-abort-hook 'swoop--highlight-for-cancel)
-;; ----------------------------------------------------------------------
+
 ;; Default action
 (defun swoop--default-action ()
   (interactive)
@@ -214,7 +214,7 @@ and execute functions listed in swoop-abort-hook"
          (recenter))))
    (with-current-buffer swoop--target-buffer (point)))
   (exit-minibuffer))
-;; ----------------------------------------------------------------------
+
 ;; Unveil a hidden target block of lines
 (defvar swoop-invisible-targets nil)
 (defsubst swoop--restore-unveiled-overlay ()
@@ -235,7 +235,7 @@ swoop-target-buffer-selection-overlay moved."
         (overlay-put $ov 'invisible nil)
         (setq swoop-invisible-targets
               (cons (cons $ov $type) swoop-invisible-targets))))))
-;; ----------------------------------------------------------------------
+
 ;; Move line up and down
 (defsubst swoop--goto-line ($line)
   (goto-char (point-min))
@@ -316,13 +316,13 @@ swoop-target-buffer-selection-overlay moved."
 (defsubst swoop--prev-line ()
   (interactive)
   (swoop--move-line 'up))
-;; ----------------------------------------------------------------------
+
 ;; For update matched lines
 (defsubst swoop--invisible-on ()
   (add-to-invisibility-spec 'swoop))
 (defsubst swoop--invisible-off ()
   (remove-from-invisibility-spec 'swoop))
-;; ----------------------------------------------------------------------
+
 ;; Overlay
 (cl-defun swoop--clear-overlay (&key $to-empty $kill)
   (swoop--mapc $buf (list swoop--target-buffer swoop-buffer)
@@ -352,7 +352,7 @@ swoop-target-buffer-selection-overlay moved."
   (overlay-put swoop-target-buffer-selection-overlay
                'face 'swoop-target-line-face)
   (overlay-put swoop-target-buffer-selection-overlay 'priority 15))
-;; ----------------------------------------------------------------------
+
 (defvar swoop--async-pool (make-hash-table :test 'equal))
 (defvar swoop--async-latest-tag nil)
 (cl-defun swoop--core (&key $query $resume)
@@ -417,7 +417,7 @@ swoop-target-buffer-selection-overlay moved."
                            (t nil)))
       (deactivate-mark))
     $results))
-;; ----------------------------------------------------------------------
+
 ;;;###autoload
 (defun swoop (&optional $query)
   (interactive)
@@ -440,7 +440,7 @@ swoop-target-buffer-selection-overlay moved."
       (swoop--core :$query (or $query (swoop--pre-input))))))
 ;;;###autoload
 (defun swoop-line-length-over80 (&optional $query) (interactive) (swoop--core :$query "^[^\n]\\{80,\\}"))
-;; ----------------------------------------------------------------------
+
 ;; Match manipulation
 (defvar swoop--keep-buffer-position 1)
 (defun swoop-update ($query $buf)
@@ -627,7 +627,7 @@ swoop-target-buffer-selection-overlay moved."
                   (swoop--async-checker
                    $result ,$tots ,$pattern ,$line-format)
                   )))))))))
-;; ----------------------------------------------------------------------
+
 ;; Converter
 ;; \w{2,3}.html?$
 ;; (swoop--pcre-convert (read-string "PCRE: " "\\w{2,3}.html?$"))
@@ -665,7 +665,7 @@ swoop-target-buffer-selection-overlay moved."
          (not swoop-use-pcre))
     (setq $input (swoop--migemo-convert $input))))
   $input)
-;; ----------------------------------------------------------------------
+
 ;; Minibuffer
 (defvar swoop-input-dilay 0)
 (defvar swoop-input-threshold 2)
@@ -705,7 +705,7 @@ swoop-target-buffer-selection-overlay moved."
       (setq swoop--last-query-plain swoop--minibuf-last-content)
       (setq swoop--minibuf-last-content "")
       (recenter))))
-;; ----------------------------------------------------------------------
+
 ;; @ Edit mode ----------------------------------------------------------
 (defvar swoop-edit-map
   (let (($map (make-sparse-keymap)))
