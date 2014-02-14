@@ -3,28 +3,27 @@
 ;; Eliminate flickering update effect
 ;; Minibuffer history
 
-
 ;;; Code
 (require 'async)
-;; (my-nest-specific-text-property-position 'invisible 'swoop)
-;; buffer-invisibility-spec
 
 (defgroup swoop nil
   "Group for swoop"
   :prefix "swoop-" :group 'convenience)
 
+;; Gloval variables
 (defvar swoop-buffer "*Swoop*")
 (defvar swoop-window nil)
-(defvar swoop-target-buffer nil)
-(defvar swoop-target-window nil)
 (defvar swoop-buffer-selection-overlay nil)
 (defvar swoop-target-buffer-selection-overlay nil)
 
-(defvar swoop--last-position 1)
-(defvar swoop--cached-count 0)
-(defvar swoop--minibuf-last-content "")
-(defvar swoop--last-query-plain "")
-(defvar swoop--last-query-converted "")
+;; Local variables
+(defvar swoop-target-buffer)
+(defvar swoop-target-window)
+(defvar swoop--last-position)
+(defvar swoop--minibuf-last-content)
+(defvar swoop--last-query-plain)
+(defvar swoop--last-query-converted)
+
 (defvar swoop-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
@@ -35,10 +34,15 @@
     (define-key map (kbd "<C-return>") 'swoop--default-action)
     map))
 
-;; Option
-(setq swoop-font-size-change: 0.9)
-(setq swoop-use-target-magnifier: nil)
 
+
+;; Option
+(defcustom swoop-font-size-change: 0.9
+  "Change fontsize temporarily during swoop."
+  :group 'swoop :type 'number)
+(defcustom swoop-use-target-magnifier nil
+  "Magnify around target line font size"
+  :group 'swoop :type 'boolean)
 
 ;; Cancel action
 (defvar swoop-abort-hook nil)
@@ -83,6 +87,8 @@ and execute functions listed in swoop-abort-hook"
   "Line number face for swoop"
   :group 'swoop)
 
+(defmacro swoop--make-local-variable ($variable $val)
+  `(set (make-local-variable ',$variable) ,$val))
 (defmacro swoop--mapc ($variable $list &rest $body)
   "Same as `mapc'"
   (declare (indent 2))
@@ -101,13 +107,9 @@ and execute functions listed in swoop-abort-hook"
                (setq $results (cons (progn ,@$body) $results)))
              ,$list-unique)
        $results)))
-;; (let ($c)
-;;   (swoop--mapc $a '(1 2 3)
-;;     (setq $c (cons (+ $a $a) $c)))
-;;   $c) ;;=> (6 4 2)
-;; (swoop--mapcr $a '(1 2 3) (* $a $a)) ;;=> (6 4 2)
 
-(defun swoop--default-action () (interactive)
+(defun swoop--default-action ()
+  (interactive)
   (run-with-timer
    0 nil
    (lambda ($po)
@@ -241,10 +243,10 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
             (goto-char $pos)
             (goto-char (line-beginning-position)))))))
 
-(cl-defsubst swoop--move-line (&optional $init)
+(cl-defsubst swoop--move-line ($direction)
   (with-selected-window swoop-window
     (let ($line-num)
-      (cl-case $init
+      (cl-case $direction
         (up   (swoop--backward-visible-line))
         (down (swoop--forward-visible-line))
         (init (cond
@@ -353,21 +355,21 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
 (defun swoop (&optional $query)
   (interactive)
   (if current-prefix-arg
-      (swoop--core :$resume t)
+      (swoop--core :$resume t :$query swoop--last-query-plain)
     (swoop--core :$query (or $query (swoop--pre-input)))))
 ;;;###autoload
 (defun swoop-pcre-regexp (&optional $query)
   (interactive)
   (let ((swoop-use-pcre t))
     (if current-prefix-arg
-        (swoop--core :$resume t)
+        (swoop--core :$resume t :$query swoop--last-query-plain)
       (swoop--core :$query (or $query (swoop--pre-input))))))
 ;;;###autoload
 (defun swoop-migemo (&optional $query)
   (interactive)
   (let ((swoop-use-migemo t))
     (if current-prefix-arg
-        (swoop--core :$resume t)
+        (swoop--core :$resume t :$query swoop--last-query-plain)
       (swoop--core :$query (or $query (swoop--pre-input))))))
 
 (cl-defun swoop--clear-overlay (&key $to-empty $kill)
@@ -625,7 +627,8 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
 (setq swoop-input-dilay 0.1)
 (setq swoop-input-threshold 2)
 (defun swoop--read-from-string ($query $buf)
-  (let (($timer nil))
+  (let (($timer nil)
+        ($first t))
     (unwind-protect
         (minibuffer-with-setup-hook
             (lambda ()
@@ -648,12 +651,11 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
                         ;; Stop old async process
                         (clrhash swoop--async-pool)
                         (setq swoop--minibuf-last-content $content)
-                        (swoop-update (swoop--convert-input $content)
-                                      $buf))))))))
+                        (swoop-update (swoop--convert-input $content) $buf)
+                        )))))))
           (read-from-minibuffer
-           "Swoop: " (or $query "") swoop-map nil
-           query-replace-from-history-variable
-           swoop--minibuffer-default-input t))
+           "Swoop: " (or $query "")
+           swoop-map nil query-replace-from-history-variable nil t))
       (when $timer (cancel-timer $timer) (setq $timer nil))
       (setq swoop--last-query-plain swoop--minibuf-last-content)
       (setq swoop--minibuf-last-content "")
@@ -766,8 +768,8 @@ This function needs to call after latest swoop-target-buffer-selection-overlay m
          (kill-buffer swoop-edit-buffer))
        (funcall swoop-display-function swoop-edit-buffer)
        (erase-buffer)
-       (set (make-local-variable 'swoop-target-buffer) $bufname)
-       (set (make-local-variable 'swoop-target-window) $bufwindow)
+       (swoop--make-local-variable swoop-target-buffer $bufname)
+       (swoop--make-local-variable swoop-target-window $bufwindow)
        ;; Header
        (insert (propertize
                 (concat " " $bufname "\n")
