@@ -39,7 +39,6 @@
 
 ;;; TODO
 ;; Unpropertize (thing-at-point 'symbol)
-;; Eliminate flickering update effect
 ;; Prevent long time loop words (], \\b, {0,} ...)
 
 ;;; Code:
@@ -317,18 +316,22 @@ swoop-target-buffer-selection-overlay moved."
   (interactive)
   (swoop--move-line 'up))
 
+(setq swoop-invisible-tag 'swoop)
+(setq swoop-invisible-tag-last nil)
 ;; For update matched lines
 (defsubst swoop--invisible-on ()
-  (add-to-invisibility-spec 'swoop))
+  (add-to-invisibility-spec swoop-invisible-tag))
 (defsubst swoop--invisible-off ()
-  (remove-from-invisibility-spec 'swoop))
+  (remove-from-invisibility-spec swoop-invisible-tag))
 
 ;; Overlay
 (cl-defun swoop--clear-overlay (&key $to-empty $kill)
   (swoop--mapc $buf (list swoop--target-buffer swoop-buffer)
+    (if (swoop--old-session?) (cl-return))
     (when (get-buffer swoop-buffer)
       (with-current-buffer $buf
         (swoop--mapc $ov (overlays-in (point-min) (point-max))
+          (if (swoop--old-session?) (cl-return))
           (when (overlay-get $ov 'swoop-temporary)
             (delete-overlay $ov))))))
   (if swoop-use-target-magnifier:
@@ -354,7 +357,7 @@ swoop-target-buffer-selection-overlay moved."
   (overlay-put swoop-target-buffer-selection-overlay 'priority 15))
 
 (defvar swoop--async-pool (make-hash-table :test 'equal))
-(defvar swoop--async-latest-tag nil)
+(defvar swoop--async-id-latest nil)
 (cl-defun swoop--core (&key $query $resume)
   (setq
    swoop--last-position (point)
@@ -445,6 +448,8 @@ swoop-target-buffer-selection-overlay moved."
 (defvar swoop--keep-buffer-position 1)
 (defun swoop-update ($query $buf)
   (when (get-buffer $buf)
+    ;; Issue a session ID
+    (setq swoop--async-id-latest (symbol-name (cl-gensym)))
     (unless (listp $query)
       (setq $query (split-string $query " " t)))
     (setq swoop--last-query-converted $query)
@@ -456,18 +461,14 @@ swoop-target-buffer-selection-overlay moved."
                   (put-text-property (point-min) (point-max) 'invisible nil)
                   (swoop--clear-overlay :$to-empty t)
                   (swoop--invisible-off))
-              (setq swoop--keep-buffer-position (point))
-              (swoop--clear-overlay)
-              ;; (swoop--invisible-off)
-              (put-text-property (point-min) (point-max) 'invisible 'swoop)
               (swoop--async-divider $query)
-              (swoop--invisible-on)
-              ;; Turn on invisible
-              (swoop--move-line 'init)))))))
+              ;; (swoop--move-line 'init)
+              ))))))
 (defsubst swoop--make-same-element-list ($list1 $list2)
   (let ($result)
     (let (($nth 0))
       (while $list1
+        (if (swoop--old-session?) (cl-return))
         (let (($top (car $list1)))
           (when (memq $top $list2)
             (setq $result (cons $top $result))))
@@ -485,6 +486,7 @@ swoop-target-buffer-selection-overlay moved."
       (setq $results (car-safe $list))
       (if (> $length 1)
           (swoop--mapc $l (cdr $list)
+            (if (swoop--old-session?) (cl-return))
             (setq $results (swoop--make-same-element-list $results $l)))))
     (setq swoop--last-visible-lines $results)))
 (cl-defun swoop--async-get-match-lines-list ($query &optional $from)
@@ -512,10 +514,15 @@ swoop-target-buffer-selection-overlay moved."
                (setq $results (cons $val $results))) $hash)
     $results))
 (cl-defun swoop--words-overlay ($pattern $line-format)
+  (setq swoop--keep-buffer-position (point))
+  (swoop--invisible-off)
+  (put-text-property (point-min) (point-max) 'invisible 'swoop)
+  (swoop--clear-overlay)
   ;; Delete counting key
-  (remhash swoop--async-latest-tag swoop--async-pool)
+  (remhash swoop--async-id-latest swoop--async-pool)
   (swoop--mapc $l (swoop--match-lines-list-common
                    (swoop--hash-values-to-list swoop--async-pool))
+    (if (swoop--old-session?) (cl-return))
     (swoop--goto-line $l)
     (let* (($lbeg (line-beginning-position))
            ($lend (line-end-position))
@@ -524,15 +531,16 @@ swoop-target-buffer-selection-overlay moved."
       ;; Show lines
       (put-text-property $lbeg (min (1+ $lend) (point-max)) 'invisible nil)
       ;; Line number overlay
-      (overlay-put $lov 'before-string
-                   (propertize
-                    (format $line-format $l)
-                    'face 'swoop-line-number-face))
-      (overlay-put $lov 'swoop-temporary t)
+      ;; (overlay-put $lov 'before-string
+      ;;              (propertize
+      ;;               (format $line-format $l)
+      ;;               'face 'swoop-line-number-face))
+      ;; (overlay-put $lov 'swoop-temporary t)
       ;; Words overlay
       (cl-block stop
         (setq $pos (re-search-forward $pattern $lend t))
         (while $pos
+          (if (swoop--old-session?) (cl-return))
           (let* (($wbeg (match-beginning 0))
                  ($wend (match-end 0))
                  ($ov (make-overlay $wbeg $wend)))
@@ -547,6 +555,7 @@ swoop-target-buffer-selection-overlay moved."
             (if (eq $pos
                     (setq $pos (re-search-forward $pattern $lend t)))
                 (cl-return-from stop nil)))))))
+  (swoop--invisible-on)
   ;; Adjust position
   (with-selected-window swoop-window
     ;; Keep position near where the cursor was at before update the list
@@ -570,7 +579,7 @@ swoop-target-buffer-selection-overlay moved."
 (defun swoop--async-checker ($result $length $pattern $line-format)
   (let* (($tag (car $result))
          ($check-key (car $tag)))
-    (if (equal swoop--async-latest-tag $check-key)
+    (if (equal swoop--async-id-latest $check-key)
         (let (($key (cdr $tag))
               ($match (cdr $result)))
           (progn
@@ -584,8 +593,12 @@ swoop-target-buffer-selection-overlay moved."
                   (puthash $key (append $v $match) swoop--async-pool)
                 (puthash $key $match swoop--async-pool)))
             (if (eq $length (gethash $check-key swoop--async-pool))
-                (swoop--words-overlay $pattern $line-format)))))))
+                (swoop--words-overlay $pattern $line-format))))
+      (setq swoop--async-id-last swoop--async-id-latest))))
+(defsubst swoop--old-session? ()
+  (not (eq swoop--async-id-last swoop--async-id-latest)))
 (cl-defun swoop--async-divider ($query)
+  (setq swoop--async-id-last swoop--async-id-latest)
   (let* (($mhhatch-lines-list nil)
          ($pos-max (point-max))
          ($length (length $query))
@@ -593,17 +606,18 @@ swoop-target-buffer-selection-overlay moved."
          ($max-line-digit (length (number-to-string $max-line)))
          ($line-format (concat "%0" (number-to-string $max-line-digit) "s: "))
          ($pattern (concat "\\(" (mapconcat 'identity $query "\\|") "\\)"))
-         ($lby 800) ;; Buffer divide by
-         ($ln (/ $max-line $lby)) ;; Result of division
-         ($lr (% $max-line $lby)) ;; Rest of division
+         ($lby 500)               ; Buffer divide by
+         ($ln (/ $max-line $lby)) ; Result of division
+         ($lr (% $max-line $lby)) ; Rest of division
          ;; Number of divided parts of a buffer
          ($bn (if (eq 0 $lr) $ln (1+ $ln)))
-         ($tots (* $bn $length)) ;; Total session
-         ($dtag))
+         ($tots (* $bn $length))  ; Total session
+         ($query-id))
     (save-excursion
       (swoop--mapc $q $query
-        (setq $dtag (symbol-name (cl-gensym)))
+        (setq $query-id (symbol-name (cl-gensym)))
         (cl-dotimes ($i $bn)
+          (if (swoop--old-session?) (cl-return))
           (async-start
            `(lambda ()
               (fundamental-mode)
@@ -619,14 +633,15 @@ swoop-target-buffer-selection-overlay moved."
                            (min $max-line (* (1+ $i) $lby))
                            swoop--target-buffer))))
               (goto-char (point-min))
-              (cons (cons ,swoop--async-latest-tag ,$dtag)
+              (cons (cons ,swoop--async-id-latest ,$query-id)
                     (funcall ,swoop--async-fn ,$q ,(* $i $lby))))
            `(lambda ($result)
               (when (get-buffer ,swoop-buffer)
                 (with-current-buffer ,swoop-buffer
                   (swoop--async-checker
                    $result ,$tots ,$pattern ,$line-format)
-                  )))))))))
+                  )))
+              ))))))
 
 ;; Converter
 ;; \w{2,3}.html?$
