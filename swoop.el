@@ -79,6 +79,7 @@ and execute functions listed in swoop-abort-hook"
          ($lbeg2 (point-at-bol))
          ($lend2 $lbeg)
          ($lov2 (make-overlay $lbeg2 $lend2)))
+    (recenter)
     (run-with-timer 0.3 nil (lambda ($o) (delete-overlay $o)) $lov)
     (overlay-put $lov 'face 'swoop-face-target-words)
     (run-with-timer 0.3 nil (lambda ($o) (delete-overlay $o)) $lov2)
@@ -260,6 +261,13 @@ and execute functions listed in swoop-abort-hook"
 (defun swoop-line-length-over80 ()
   (interactive)
   (swoop-core :$query "^[^\n]\\{80,\\}"))
+;;;###autoload
+(defun swoop-from-isearch ()
+  (interactive)
+  (swoop :$query (if isearch-regexp
+                     isearch-string
+                   (regexp-quote isearch-string))))
+;;(define-key isearch-mode-map (kbd "C-o") 'helm-swoop-from-isearch)
 
 (defun swoop-multi-from-swoop ()
   (interactive)
