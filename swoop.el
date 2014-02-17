@@ -383,6 +383,7 @@ and execute functions listed in swoop-abort-hook"
                    (swoop-mapc $n (swoop-buffer-info-get-map "buf-number")
                      (setq $r (+ $n $r)))
                    $r)))
+      (setq swoop-last-pattern $pattern)
       (unless $multi
         (let* (($buf         swoop--target-buffer)
                ($buf-hash    (ht-get swoop-buffer-info $buf))

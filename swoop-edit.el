@@ -97,6 +97,7 @@
                  (remove-text-properties (point) (point-at-eol) '(read-only t))
                  (set-text-properties (point-at-eol) (1+ (point-at-eol))
                                       '(read-only t rear-nonsticky t)))))))
+       (swoop-overlay-word swoop-last-pattern (current-buffer))
        (goto-char (point-min))
        (forward-line 1)
        (re-search-forward "^[[:space:]]*\\([0-9]+\\)::[[:space:]]" nil t)

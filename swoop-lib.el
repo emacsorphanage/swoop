@@ -35,6 +35,7 @@
 (defvar swoop-minibuffer-history nil)
 (defvar swoop-last-query-plain nil)
 (defvar swoop-last-query-converted nil)
+(defvar swoop-last-pattern nil)
 (defvar swoop-minibuf-last-content nil)
 
 (defvar swoop--target-buffer nil)
