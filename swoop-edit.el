@@ -19,36 +19,36 @@
 
 (defvar swoop-edit-map
   (let (($map (make-sparse-keymap)))
-    ;; (define-key $map (kbd "C-x C-s") 'swoop--edit-apply-changes)
-    (define-key $map (kbd "C-x C-s") 'swoop--edit-finish)
-    (define-key $map (kbd "C-c C-c") 'swoop--edit-finish)
+    ;; (define-key $map (kbd "C-x C-s") 'swoop-edit-apply-changes)
+    (define-key $map (kbd "C-x C-s") 'swoop-edit-finish)
+    (define-key $map (kbd "C-c C-c") 'swoop-edit-finish)
     $map))
-(define-key swoop-map (kbd "C-c C-e") 'swoop--edit)
+(define-key swoop-map (kbd "C-c C-e") 'swoop-edit)
 
-(defun swoop--edit-finish ()
+(defun swoop-edit-finish ()
   (interactive)
   (select-window swoop--target-window)
   (with-current-buffer swoop--target-buffer
     (set-window-buffer nil swoop--target-buffer)
-    (goto-char swoop--last-position))
+    (goto-char swoop--target-last-position))
   (kill-buffer swoop-edit-buffer))
 
-(defun swoop--modify-buffer-content ($bufcont)
+(defun swoop-modify-buffer-content ($bufcont)
   "Modify the original buffer content, but it causes slow rendering."
   $bufcont)
 
-(defsubst swoop--line-beg-point ($line &optional $buf)
+(defsubst swoop-line-beg-point ($line &optional $buf)
   (with-current-buffer (or $buf (current-buffer))
     (save-excursion
-      (swoop--goto-line $line) (point))))
+      (swoop-goto-line $line) (point))))
 
-(defsubst swoop--set-marker ($line &optional $buf)
+(defsubst swoop-set-marker ($line &optional $buf)
   (with-current-buffer (or $buf (current-buffer))
     (save-excursion
-      (swoop--goto-line $line)
+      (swoop-goto-line $line)
       (set-marker (make-marker) (point)))))
 
-(defun swoop--edit ()
+(defun swoop-edit ()
   (interactive)
   (let (($bufcont (with-current-buffer swoop-buffer
                     (buffer-substring
@@ -82,8 +82,7 @@
                  (insert (propertize
                           (format "%s:: " $linum)
                           'swp t
-                          'face 'swoop-line-number-face
-                          'swoop-target (set-marker (make-marker) (point))
+                          'face 'swoop-face-line-number
                           'intangible t
                           'rear-nonsticky t
                           'read-only t))
@@ -91,7 +90,7 @@
                   (point-at-bol) (point-at-eol)
                   'swm (save-excursion
                          (with-current-buffer $line-buf
-                           (swoop--goto-line $linum)
+                           (swoop-goto-line $linum)
                            (set-marker
                             (make-marker)
                             (point)))))
@@ -101,14 +100,14 @@
        (goto-char (point-min))
        (forward-line 1)
        (re-search-forward "^[[:space:]]*\\([0-9]+\\)::[[:space:]]" nil t)
-       (add-hook 'after-change-functions 'swoop--edit-sync nil t)
+       (add-hook 'after-change-functions 'swoop-edit-sync nil t)
        (use-local-map swoop-edit-map))
      ;; Args
      $bufcont
      swoop--target-buffer)
     (exit-minibuffer)))
 
-(defun swoop--edit-sync ($beg $end $length)
+(defun swoop-edit-sync ($beg $end $length)
   (save-excursion
     (goto-char $beg)
     (let* (($line-beg (point-at-bol))
@@ -139,7 +138,7 @@
           (with-selected-window $win
             (goto-char $marker)
             ;; Unveil invisible block
-            (swoop--mapc $ov
+            (swoop-mapc $ov
                 (overlays-in (point-at-bol)
                              (point-at-eol))
               (let (($type (overlay-get $ov 'invisible)))

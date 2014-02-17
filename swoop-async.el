@@ -16,22 +16,21 @@
 
 (require 'swoop-lib)
 
-(defvar swoop--async-pool (make-hash-table :test 'equal))
-(defvar swoop--async-id-latest nil)
-(defvar swoop--async-id-last nil)
-(defvar swoop--async-get-match-lines-list
+(defvar swoop-async-pool (make-hash-table :test 'equal))
+(defvar swoop-async-id-latest nil)
+(defvar swoop-async-id-last nil)
+(defvar swoop-async-get-match-lines-list
   "Byte compiled function. It works in async process.")
 
+(defsubst swoop-async-old-session? ()
+  (not (equal swoop-async-id-last swoop-async-id-latest)))
 
-(defsubst swoop--old-session? ()
-  (not (equal swoop--async-id-last swoop--async-id-latest)))
-
-(defmacro swoop--async-start ($start-func $finish-func)
+(defmacro swoop-async-start ($start-func $finish-func)
   (require 'find-func)
   (let ((procvar (make-symbol "proc")))
     `(let* ((sexp ,$start-func)
             (,procvar
-             (swoop--async-start-process
+             (swoop-async-start-process
               "swoop-batch" (file-truename
                        (expand-file-name invocation-name
                                          invocation-directory))
@@ -47,12 +46,7 @@
            (async--transmit-sexp ,procvar (list 'quote sexp)))
        ,procvar)))
 
-(defun swoop--async-start-process (name program finish-func &rest program-args)
-  "Start the executable PROGRAM asynchronously.  See `async-start'.
-PROGRAM is passed PROGRAM-ARGS, calling FINISH-FUNC with the
-process object when done.  If FINISH-FUNC is nil, the future
-object will return the process object when the program is
-finished."
+(defun swoop-async-start-process (name program finish-func &rest program-args)
   (let* ((buf (generate-new-buffer (concat "*" name "*")))
          (proc (let ((process-connection-type nil))
                  (apply #'start-process name buf program program-args))))
@@ -63,7 +57,7 @@ finished."
         (set (make-local-variable 'async-callback-for-process) t))
       proc)))
 
-(defun swoop--kill-process-buffer ()
+(defun swoop-async-kill-process-buffer ()
   (mapc (lambda ($buf)
           (setq $buf (buffer-name $buf))
           (when (string-match "^\\*swoop-batch\\*" $buf)
@@ -71,13 +65,13 @@ finished."
               (kill-buffer $buf))))
         (buffer-list)))
 
-(defun swoop--kill-process ()
+(defun swoop-async-kill-process ()
   (mapc (lambda ($proc)
           (when (string-match "swoop-batch" (process-name $proc))
             (delete-process $proc)))
         (process-list)))
 
-(defun swoop--async-get-match-lines-list
+(defun swoop-async-get-match-lines-list
   ($query $from $line-format $line-face $buf)
   ;; Prevent "Odd length text property list" error
   (setq vc-handled-backends nil)
@@ -101,7 +95,7 @@ finished."
                 (setq $match-total (cons $match-lines $match-total))
                 (setq $match-lines nil)))
             $query)
-      ;; Culling all words match lines
+      ;; Common match line mapping
       (let* (($results)
              ($length (length $match-total)))
         (when (> $length 0)
@@ -119,7 +113,7 @@ finished."
                               (nreverse $r))))
                     (cdr $match-total))))
         (setq $match-lines-common $results))
-
+      ;; Culling all words match lines
       (mapc (lambda ($l)
               (goto-char $pos-min)
               (forward-line (1- $l))
@@ -136,8 +130,8 @@ finished."
                        $lines))))
             $match-lines-common)
       (cons $match-lines-common $lines))))
-(setq swoop--async-get-match-lines-list
-      (byte-compile 'swoop--async-get-match-lines-list))
+(setq swoop-async-get-match-lines-list
+      (byte-compile 'swoop-async-get-match-lines-list))
 
 
 (provide 'swoop-async)
