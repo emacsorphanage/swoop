@@ -180,17 +180,21 @@ swoop-target-buffer-selection-overlay moved."
 
 (defun swoop--set-buffer-info ($buf)
   (with-current-buffer $buf
-    (let* (($buf-content (buffer-substring-no-properties (point-min) (point-max)))
-           ($point-min (point-min))
-           ($point-max (point-max))
-           ($max-line (line-number-at-pos $point-max))
+    (let* (($buf-content    (buffer-substring-no-properties
+                             (point-min) (point-max)))
+           ($point          (point))
+           ($point-min      (point-min))
+           ($point-max      (point-max))
+           ($max-line       (line-number-at-pos $point-max))
            ($max-line-digit (length (number-to-string $max-line)))
-           ($line-format (concat "%0" (number-to-string $max-line-digit) "s: "))
-           ($by 3000)               ; Buffer divide by
-           ($res (/ $max-line $by)) ; Result of division
-           ($rest (% $max-line $by)) ; Rest of division
+           ($line-format    (concat "%0"
+                                    (number-to-string $max-line-digit)
+                                    "s: "))
+           ($by 3000)                      ; Buffer divide by
+           ($result  (/ $max-line $by))    ; Result of division
+           ($rest    (% $max-line $by))    ; Rest of division
            ;; Number of divided parts of a buffer
-           ($buf-num (if (eq 0 $rest) $res (1+ $res)))
+           ($buf-num (if (eq 0 $rest) $result (1+ $result)))
            ($separated-buffer))
       (let (($with-end-break (concat $buf-content "\n")))
         (cl-dotimes ($i $buf-num)
@@ -199,23 +203,23 @@ swoop-target-buffer-selection-overlay moved."
                  (substring-no-properties
                   $with-end-break
                   (1- (save-excursion (swoop--goto-line (1+ (* $i $by))) (point)))
-                  ;; To show the last line
                   (if (>= (* (1+ $i) $by) $max-line)
                       nil
                     (1- (save-excursion
                           (swoop--goto-line (1+ (* (1+ $i) $by))) (point)))))
                  $separated-buffer))))
       (setq swoop--target-buffer-info
-            (ht ("buf-name" $buf)
-                ("buf-content" $buf-content)
+            (ht ("buf-name"                $buf)
+                ("buf-content"             $buf-content)
                 ("buf-separated" (nreverse $separated-buffer))
-                ("buf-number" $buf-num)
-                ("point-min" $point-min)
-                ("point-max" $point-max)
-                ("max-line" $max-line)
-                ("max-line-digit" $max-line-digit)
-                ("line-format" $line-format)
-                ("divide-by" $by)))
+                ("buf-number"              $buf-num)
+                ("point"                   $point)
+                ("point-min"               $point-min)
+                ("point-max"               $point-max)
+                ("max-line"                $max-line)
+                ("max-line-digit"          $max-line-digit)
+                ("line-format"             $line-format)
+                ("divide-by"               $by)))
       (ht-set swoop-buffer-info $buf swoop--target-buffer-info)))
   nil)
 
@@ -262,7 +266,7 @@ swoop-target-buffer-selection-overlay moved."
   (ht-get (ht-get swoop-buffer-info $buf) $key2))
 
 (defun swoop--buffer-info-get-map ($key)
-  (ht-map (lambda ($bname $binfo)
+  (ht-map (lambda (ignored $binfo)
             (ht-get $binfo $key))
           swoop-buffer-info))
 

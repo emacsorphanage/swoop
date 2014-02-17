@@ -88,10 +88,9 @@ finished."
            (buffer-invisibility-spec nil)
            ($match-lines)
            ($match-total)
-           ($match-lines-common)
-           ($po t))
+           ($match-lines-common))
       (goto-char $pos-min)
-      (put-text-property (point-min) (point-max) 'swb $buf)
+      (put-text-property $pos-min $pos-max 'swb $buf)
       ;; Get lines at least one match
       (mapc (lambda ($q)
               (save-excursion

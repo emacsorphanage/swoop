@@ -55,7 +55,7 @@
                      (point-min) (point-max)))))
     (run-with-timer
      0 nil
-     (lambda ($bufcont $bufname $bufwindow)
+     (lambda ($bufcont $bufname)
        (when (get-buffer swoop-edit-buffer)
          (kill-buffer swoop-edit-buffer))
        (funcall swoop-display-function swoop-edit-buffer)
@@ -105,8 +105,7 @@
        (use-local-map swoop-edit-map))
      ;; Args
      $bufcont
-     swoop--target-buffer
-     swoop--target-window)
+     swoop--target-buffer)
     (exit-minibuffer)))
 
 (defun swoop--edit-sync ($beg $end $length)
