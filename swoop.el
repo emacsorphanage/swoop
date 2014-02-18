@@ -78,12 +78,14 @@ and execute functions listed in swoop-abort-hook"
    0 nil (lambda () (run-hooks 'swoop-abort-hook)))
   (exit-minibuffer))
 (defun swoop-back-to-last-position ()
+  "Back cursor position to where the last swoop happened."
   (interactive)
   (let (($po swoop--target-last-position))
     (setq swoop--target-last-position (point))
     (with-selected-window swoop--target-window
       (goto-char $po))))
 (defun swoop-highlight-for-cancel ()
+  "Prevent loosing sight of cursor position. It'll evaporate at once."
   (interactive)
   (let* (($lbeg (point))
          ($lend (point-at-eol))
@@ -101,6 +103,7 @@ and execute functions listed in swoop-abort-hook"
 
 ;; Default action
 (defun swoop-action-goto-target-point ()
+  "Finish searching and goto the target line"
   (interactive)
   (run-with-timer
    0 nil
@@ -134,6 +137,7 @@ and execute functions listed in swoop-abort-hook"
 
 ;; Overlay
 (cl-defun swoop-overlay-clear (&key $to-empty $kill $multi)
+  "Clear overlays, and kill swoop-buffer"
   (if (and $kill (get-buffer swoop-buffer))
       (kill-buffer swoop-buffer))
   (if swoop-use-target-magnifier:
@@ -230,10 +234,10 @@ and execute functions listed in swoop-abort-hook"
 
 (defcustom swoop-pre-input-point-at-function:
   (lambda () (thing-at-point 'symbol))
-  "Change pre input action. Default is get symbol where cursor at"
-  :group 'swoop
-  :type 'symbol)
+  "Change pre input action. Default is get symbol where cursor at."
+  :group 'swoop :type 'symbol)
 (defun swoop-pre-input (&optional $resume)
+  "Pre input function. Utilize region and at point symbol"
   (let ($results)
     (if $resume
         (setq $results swoop-last-query-plain)
@@ -247,18 +251,22 @@ and execute functions listed in swoop-abort-hook"
 
 ;;;###autoload
 (defun swoop (&optional $query)
+  "Search through words within the current buffer."
   (interactive)
   (if current-prefix-arg
       (swoop-core :$resume t :$query swoop-last-query-plain)
     (swoop-core :$query (or $query (swoop-pre-input)))))
 ;;;###autoload
 (defun swoop-multi (&optional $query)
+  "Search words across currently opened multiple buffers.
+Ignore non file buffer."
   (interactive)
   (if current-prefix-arg
       (swoop-core :$resume t :$query swoop-last-query-plain :$multi t)
     (swoop-core :$query (or $query (swoop-pre-input)) :$multi t)))
 ;;;###autoload
 (defun swoop-pcre-regexp (&optional $query)
+  "Use PCRE like regexp to swoop."
   (interactive)
   (setq swoop-use-pcre t)
   (if current-prefix-arg
@@ -266,6 +274,7 @@ and execute functions listed in swoop-abort-hook"
     (swoop-core :$query (or $query (swoop-pre-input)))))
 ;;;###autoload
 (defun swoop-migemo (&optional $query)
+  "Japanese words matching with the alphabet."
   (interactive)
   (setq swoop-use-migemo t)
   (if current-prefix-arg
@@ -273,10 +282,12 @@ and execute functions listed in swoop-abort-hook"
     (swoop-core :$query (or $query (swoop-pre-input)))))
 ;;;###autoload
 (defun swoop-line-length-over80 ()
+  "Get over 80 colomn number linees."
   (interactive)
   (swoop-core :$query "^[^\n]\\{80,\\}"))
 ;;;###autoload
 (defun swoop-from-isearch ()
+  "During isearch, switch over to swoop."
   (interactive)
   (swoop-core :$query (if isearch-regexp
                           isearch-string
@@ -284,6 +295,7 @@ and execute functions listed in swoop-abort-hook"
 ;; (define-key isearch-mode-map (kbd "C-o") 'swoop-from-isearch)
 
 (defun swoop-multi-from-swoop ()
+  "During swoop, switch over to swoop-multi."
   (interactive)
   (let (($last-query swoop-minibuf-last-content))
     (run-with-timer
@@ -296,6 +308,7 @@ and execute functions listed in swoop-abort-hook"
 
 ;;;###autoload
 (defun swoop-from-evil-search ()
+  "During evil-search, switch over to swoop."
   (interactive)
   (if (string-match "\\(isearch-\\|evil.*search\\)"
                     (symbol-name real-last-command))
@@ -336,6 +349,7 @@ and execute functions listed in swoop-abort-hook"
       (setq swoop-async-id-last swoop-async-id-latest))))
 
 (cl-defun swoop-render ($pattern $multi)
+  "Rendering results, and repositioning the selected line."
   (swoop-overlay-clear :$multi $multi)
   (setq swoop-last-selected-buffer
         (or (get-text-property (point-at-bol) 'swb)
@@ -408,6 +422,7 @@ and execute functions listed in swoop-abort-hook"
          (get-text-property (point-at-bol) 'swb))))))
 
 (cl-defun swoop-async-divider ($query &optional $multi)
+  "Divide buffers for async process."
   (with-current-buffer swoop-buffer
     (setq swoop-async-id-last swoop-async-id-latest)
     (let (($pattern (concat "\\(" (mapconcat 'identity $query "\\|") "\\)"))
@@ -475,6 +490,7 @@ and execute functions listed in swoop-abort-hook"
 
 ;; Minibuffer
 (defun swoop-minibuffer-read-from-string ($query $multi)
+  "Observe minibuffer inputs."
   (let (($timer nil))
     (unwind-protect
         (minibuffer-with-setup-hook

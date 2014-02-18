@@ -129,6 +129,7 @@ the selected line position will be at the other side of the list."
 
 ;; Move line up and down
 (defsubst swoop-line-move-within-target-window ()
+  "Manage the target window's behavior"
   (let (($line-num (get-text-property (point) 'swl))
         ($buf (get-text-property (point) 'swb)))
     (cl-labels ((line-action ()
@@ -225,6 +226,7 @@ the selected line position will be at the other side of the list."
 
 ;; Font size manipulation
 (defun swoop-overlay-font-size-change (&optional $multi)
+  "Change whole buffer's text size"
   (when swoop-font-size-change:
     (let (($ov (make-overlay (point-min) (point-max))))
       (setq swoop-overlay-target-buffer (cons $ov nil))
@@ -241,6 +243,7 @@ the selected line position will be at the other side of the list."
 
 (defvar swoop-overlay-magnify-around-target-line nil)
 (cl-defun swoop-magnify-around-target
+    "Magnify lines around the target line."
     (&key ($around swoop-use-target-magnifier-around:)
           ($size swoop-use-target-magnifier-size:)
           $delete $buffer)
@@ -345,6 +348,7 @@ swoop-overlay-target-buffer-selection moved."
               (cons (cons $ov $type) swoop-invisible-targets))))))
 
 (defun swoop-set-buffer-info ($buf)
+  "Collect buffers information. It's used for multiple uses."
   (with-current-buffer $buf
     (let* (($buf-content    (buffer-substring-no-properties
                              (point-min) (point-max)))
@@ -431,7 +435,7 @@ swoop-overlay-target-buffer-selection moved."
 
 ;; (swoop-nearest-line 50 '(10 90 20 80 30 40 45 56 70))
 (defun swoop-nearest-line ($target $list)
-  "Return nearest number of $target out of $list."
+  "Return the nearest number of $target out of $list."
   (when (and $target $list)
     (let ($result)
       (cl-labels ((filter ($fn $elem $list)
@@ -517,6 +521,7 @@ swoop-overlay-target-buffer-selection moved."
         (process-list)))
 
 (defun swoop-async-get-match-lines-list
+  "Distributed processing by async.el"
   ($query $from $line-format $line-face $buf)
   ;; Prevent "Odd length text property list" error
   (setq vc-handled-backends nil)
@@ -580,6 +585,7 @@ swoop-overlay-target-buffer-selection moved."
 
 
 (cl-defun swoop-overlay-word ($pattern $buf)
+  "Overlay match words."
   (with-current-buffer $buf
     (save-excursion
       (goto-char (point-min))
