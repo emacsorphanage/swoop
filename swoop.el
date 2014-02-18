@@ -212,7 +212,9 @@ and execute functions listed in swoop-abort-hook"
       (when $multi
         (swoop-mapc $buf (ht-keys swoop-buffer-info)
           (unless (equal $buf (buffer-name (current-buffer)))
-            (goto-char (swoop-buffer-info-get $buf "point"))))))))
+            (goto-char (swoop-buffer-info-get $buf "point")))))
+      (setq swoop-use-pcre nil)
+      (setq swoop-use-migemo nil))))
 
 (defcustom swoop-pre-input-point-at-function:
   (lambda () (thing-at-point 'symbol))
@@ -246,17 +248,17 @@ and execute functions listed in swoop-abort-hook"
 ;;;###autoload
 (defun swoop-pcre-regexp (&optional $query)
   (interactive)
-  (let ((swoop-use-pcre t))
-    (if current-prefix-arg
-        (swoop-core :$resume t :$query swoop-last-query-plain)
-      (swoop-core :$query (or $query (swoop-pre-input))))))
+  (setq swoop-use-pcre t)
+  (if current-prefix-arg
+      (swoop-core :$resume t :$query swoop-last-query-plain)
+    (swoop-core :$query (or $query (swoop-pre-input)))))
 ;;;###autoload
 (defun swoop-migemo (&optional $query)
   (interactive)
-  (let ((swoop-use-migemo t))
-    (if current-prefix-arg
-        (swoop-core :$resume t :$query swoop-last-query-plain)
-      (swoop-core :$query (or $query (swoop-pre-input))))))
+  (setq swoop-use-migemo t)
+  (if current-prefix-arg
+      (swoop-core :$resume t :$query swoop-last-query-plain)
+    (swoop-core :$query (or $query (swoop-pre-input)))))
 ;;;###autoload
 (defun swoop-line-length-over80 ()
   (interactive)
@@ -271,11 +273,11 @@ and execute functions listed in swoop-abort-hook"
 
 (defun swoop-multi-from-swoop ()
   (interactive)
-  (let (($last-query (format "%s" (minibuffer-contents))))
+  (let (($last-query swoop-minibuf-last-content))
     (run-with-timer
      0 nil
      (lambda ($q)
-       (swoop-core :$query $q :$multi t))
+       (swoop-core :$query $q :$resume t :$multi t))
      $last-query)
     (exit-minibuffer)))
 ;; (define-key swoop-map (kbd "C-o") 'swoop-multi-from-swoop)

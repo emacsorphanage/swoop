@@ -254,9 +254,10 @@ the selected line position will be at the other side of the list."
         (progn (goto-char (or $point (point))) (line-number-at-pos)))))
 
 (defun swoop-header-format-line-set ($buffer-name)
-  (with-selected-window swoop-window
-    (setq header-line-format
-          (propertize $buffer-name 'face 'swoop-face-header-format-line))))
+  (when (stringp $buffer-name)
+    (with-selected-window swoop-window
+      (setq header-line-format
+            (propertize $buffer-name 'face 'swoop-face-header-format-line)))))
 
 ;; Converter
 ;; \w{2,3}.html?$
@@ -281,8 +282,8 @@ the selected line position will be at the other side of the list."
          (replace-regexp-in-string
           "\n" ""
           (shell-command-to-string
-           (concat "cmigemo" " -w " $q " " swoop-migemo-options))))))
-  (error "cmigemo not found..."))
+           (concat "cmigemo" " -w " $q " " swoop-migemo-options)))))
+    (error "cmigemo not found...")))
 
 (defun swoop-convert-input ($input)
   (cond
