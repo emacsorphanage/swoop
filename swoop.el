@@ -264,10 +264,10 @@ and execute functions listed in swoop-abort-hook"
 ;;;###autoload
 (defun swoop-from-isearch ()
   (interactive)
-  (swoop :$query (if isearch-regexp
-                     isearch-string
-                   (regexp-quote isearch-string))))
-;;(define-key isearch-mode-map (kbd "C-o") 'helm-swoop-from-isearch)
+  (swoop-core :$query (if isearch-regexp
+                          isearch-string
+                        (regexp-quote isearch-string))))
+;; (define-key isearch-mode-map (kbd "C-o") 'swoop-from-isearch)
 
 (defun swoop-multi-from-swoop ()
   (interactive)
@@ -278,7 +278,18 @@ and execute functions listed in swoop-abort-hook"
        (swoop-core :$query $q :$multi t))
      $last-query)
     (exit-minibuffer)))
-(define-key swoop-map (kbd "C-o") 'swoop-multi-from-swoop)
+;; (define-key swoop-map (kbd "C-o") 'swoop-multi-from-swoop)
+
+;;;###autoload
+(defun swoop-from-evil-search ()
+  (interactive)
+  (if (string-match "\\(isearch-\\|evil.*search\\)"
+                    (symbol-name real-last-command))
+      (swoop-core :$query (if isearch-regexp
+                              isearch-string
+                            (regexp-quote isearch-string)))
+    (swoop)))
+;; (define-key evil-motion-state-map (kbd "C-o") 'swoop-from-evil-search)
 
 (defun swoop-update ($query $multi)
   (when (get-buffer swoop-buffer)
