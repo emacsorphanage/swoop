@@ -79,6 +79,35 @@
 (defvar swoop-face-line-number 'swoop-face-line-number
   "For pass to async batch")
 
+(defcustom swoop-use-target-magnifier: t
+  "Magnify around target line font size"
+  :group 'swoop :type 'boolean)
+(defcustom swoop-use-target-magnifier-around: 10
+  "Magnify around target line font size"
+  :group 'swoop :type 'boolean)
+(defcustom swoop-use-target-magnifier-size: 1.2
+  "Magnify around target line font size"
+  :group 'swoop :type 'boolean)
+(defcustom swoop-line-move-loop: t
+  "If the selected line is at one of the edges of the list, and move further,
+the selected line position will be at the other side of the list."
+  :group 'swoop :type 'boolean)
+(defcustom swoop-window-split-current-window: nil
+ "Split window when having multiple windows open"
+ :group 'swoop :type 'boolean)
+(defcustom swoop-window-split-direction: 'split-window-vertically
+ "Split window direction"
+ :type '(choice (const :tag "vertically"   split-window-vertically)
+                (const :tag "horizontally" split-window-horizontally))
+ :group 'swoop)
+(defcustom swoop-font-size-change: t
+  "Change font size temporarily during swoop."
+  :group 'swoop :type 'boolean)
+(defcustom swoop-font-size: 0.9
+  "Specify font size if `swoop-font-size-change:' is not nil."
+  :group 'swoop :type 'number)
+
+
 (defmacro swoop-mapc ($variable $list &rest $body)
   "Same as `mapc'"
   (declare (indent 2))
@@ -99,11 +128,6 @@
        $results)))
 
 ;; Move line up and down
-(defcustom swoop-line-move-loop: t
-  "If the selected line is at one of the edges of the list, and move further,
-the selected line position will be at the other side of the list."
-  :group 'swoop :type 'boolean)
-
 (defsubst swoop-line-move-within-target-window ()
   (let (($line-num (get-text-property (point) 'swl))
         ($buf (get-text-property (point) 'swb)))
@@ -128,6 +152,19 @@ the selected line position will be at the other side of the list."
           (line-action))
         (setq swoop-last-selected-buffer $buf)))))
 
+
+(defsubst swoop-action-goto-line-next ()
+  (interactive)
+  (swoop-line-move 'down))
+(defsubst swoop-action-goto-line-prev ()
+  (interactive)
+  (swoop-line-move 'up))
+(defsubst swoop-action-goto-line-top ()
+  (interactive)
+  (swoop-line-move 'top))
+(defsubst swoop-action-goto-line-bottom ()
+  (interactive)
+  (swoop-line-move 'bottom))
 (defsubst swoop-line-forward ()
   (let (($po (next-single-property-change (point) 'swl)))
     (if $po
@@ -138,7 +175,7 @@ the selected line position will be at the other side of the list."
                 (goto-char $over-header))))
       ;; Loop
       (if swoop-line-move-loop:
-          (swoop-line-move 'top)))))
+          (swoop-action-goto-line-top)))))
 (defsubst swoop-line-backward ()
   (let (($po (previous-single-property-change (point) 'swl)))
     (if $po
@@ -148,7 +185,7 @@ the selected line position will be at the other side of the list."
             (if (get-text-property $over-header 'swl)
                 (goto-char $over-header))))
       (if swoop-line-move-loop:
-          (swoop-line-move 'bottom)))))
+          (swoop-action-goto-line-bottom)))))
 (cl-defun swoop-line-move ($direction)
   (with-selected-window swoop-window
     (cl-case $direction
@@ -174,28 +211,8 @@ the selected line position will be at the other side of the list."
      (point) (min (1+ (point-at-eol)) (point-max)))
     (swoop-line-move-within-target-window)
     (recenter)))
-(defsubst swoop-action-goto-line-next ()
-  (interactive)
-  (swoop-line-move 'down))
-(defsubst swoop-action-goto-line-prev ()
-  (interactive)
-  (swoop-line-move 'up))
-(defsubst swoop-action-goto-line-top ()
-  (interactive)
-  (swoop-line-move 'top))
-(defsubst swoop-action-goto-line-bottom ()
-  (interactive)
-  (swoop-line-move 'bottom))
 
 ;; Window configuration
-(defcustom swoop-window-split-current-window: nil
- "Split window when having multiple windows open"
- :group 'swoop :type 'boolean)
-(defcustom swoop-window-split-direction: 'split-window-vertically
- "Split window direction"
- :type '(choice (const :tag "vertically"   split-window-vertically)
-                (const :tag "horizontally" split-window-horizontally))
- :group 'swoop)
 (defvar swoop-display-function
   (lambda ($buf)
     (if swoop-window-split-current-window:
@@ -207,12 +224,6 @@ the selected line position will be at the other side of the list."
   "Determine how to deploy swoop window")
 
 ;; Font size manipulation
-(defcustom swoop-font-size-change: t
-  "Change font size temporarily during swoop."
-  :group 'swoop :type 'boolean)
-(defcustom swoop-font-size: 0.9
-  "Specify font size if `swoop-font-size-change:' is not nil."
-  :group 'swoop :type 'number)
 (defun swoop-overlay-font-size-change (&optional $multi)
   (when swoop-font-size-change:
     (let (($ov (make-overlay (point-min) (point-max))))
@@ -228,16 +239,6 @@ the selected line position will be at the other side of the list."
                     (cons $ov swoop-overlay-target-buffer))
               (overlay-put $ov 'face `(:height ,swoop-font-size:)))))))))
 
-
-(defcustom swoop-use-target-magnifier: t
-  "Magnify around target line font size"
-  :group 'swoop :type 'boolean)
-(defcustom swoop-use-target-magnifier-around: 10
-  "Magnify around target line font size"
-  :group 'swoop :type 'boolean)
-(defcustom swoop-use-target-magnifier-size: 1.2
-  "Magnify around target line font size"
-  :group 'swoop :type 'boolean)
 (defvar swoop-overlay-magnify-around-target-line nil)
 (cl-defun swoop-magnify-around-target
     (&key ($around swoop-use-target-magnifier-around:)
@@ -419,13 +420,6 @@ swoop-overlay-target-buffer-selection moved."
       (unless (member $buf $bufs)
         (ht-remove! swoop-buffer-info $buf)))))
 
-(defun swoop-cache-clear ()
-  (when (not (ht-empty? swoop-buffer-info))
-    (ht-clear! swoop-buffer-info)
-    (swoop-async-kill-process)
-    (swoop-async-kill-process-buffer)))
-(add-hook 'after-save-hook 'swoop-cache-clear)
-
 (defun swoop-buffer-info-get ($buf $key2)
   (ht-get (ht-get swoop-buffer-info $buf) $key2))
 
@@ -465,6 +459,139 @@ swoop-overlay-target-buffer-selection moved."
                         (t 1))))))
       $result)))
 
+
+;; Async
+(defvar swoop-async-pool (make-hash-table :test 'equal))
+(defvar swoop-async-id-latest nil)
+(defvar swoop-async-id-last nil)
+(defvar swoop-async-get-match-lines-list
+  "Byte compiled function. It works in async process.")
+
+(defsubst swoop-async-old-session? ()
+  (not (equal swoop-async-id-last swoop-async-id-latest)))
+
+(defmacro swoop-async-start ($start-func $finish-func)
+  (require 'find-func)
+  (let ((procvar (make-symbol "proc")))
+    `(let* ((sexp ,$start-func)
+            (,procvar
+             (swoop-async-start-process
+              "swoop-batch" (file-truename
+                       (expand-file-name invocation-name
+                                         invocation-directory))
+              ,$finish-func
+              "-Q" "-l" ,(symbol-file 'async-batch-invoke 'defun)
+              "-batch" "-f" "async-batch-invoke"
+              (if async-send-over-pipe
+                  "<none>"
+                (with-temp-buffer
+                  (async--insert-sexp (list 'quote sexp))
+                  (buffer-string))))))
+       (if async-send-over-pipe
+           (async--transmit-sexp ,procvar (list 'quote sexp)))
+       ,procvar)))
+
+(defun swoop-async-start-process (name program finish-func &rest program-args)
+  (let* ((buf (generate-new-buffer (concat "*" name "*")))
+         (proc (let ((process-connection-type nil))
+                 (apply #'start-process name buf program program-args))))
+    (with-current-buffer buf
+      (set (make-local-variable 'async-callback) finish-func)
+      (set-process-sentinel proc #'async-when-done)
+      (unless (string= name "swoop-batch")
+        (set (make-local-variable 'async-callback-for-process) t))
+      proc)))
+
+(defun swoop-async-kill-process-buffer ()
+  (mapc (lambda ($buf)
+          (setq $buf (buffer-name $buf))
+          (when (string-match "^\\*swoop-batch\\*" $buf)
+            (let ((kill-buffer-query-functions nil))
+              (kill-buffer $buf))))
+        (buffer-list)))
+
+(defun swoop-async-kill-process ()
+  (mapc (lambda ($proc)
+          (when (string-match "swoop-batch" (process-name $proc))
+            (delete-process $proc)))
+        (process-list)))
+
+(defun swoop-async-get-match-lines-list
+  ($query $from $line-format $line-face $buf)
+  ;; Prevent "Odd length text property list" error
+  (setq vc-handled-backends nil)
+  (save-excursion
+    (let* (($lines nil)
+           ($pos-min (point-min))
+           ($pos-max (point-max))
+           (buffer-invisibility-spec nil)
+           ($match-lines)
+           ($match-total)
+           ($match-lines-common))
+      (goto-char $pos-min)
+      (put-text-property $pos-min $pos-max 'swb $buf)
+      ;; Get lines at least one match
+      (mapc (lambda ($q)
+              (save-excursion
+                (goto-char $pos-min)
+                (while (re-search-forward $q nil t)
+                  (setq $match-lines (cons (line-number-at-pos) $match-lines))
+                  (forward-line))
+                (setq $match-total (cons $match-lines $match-total))
+                (setq $match-lines nil)))
+            $query)
+      ;; Common match line mapping
+      (let* (($results)
+             ($length (length $match-total)))
+        (when (> $length 0)
+          (setq $results (car-safe $match-total))
+          (if (> $length 1)
+              (mapc (lambda ($l)
+                      (setq $results
+                            (let (($r) ($nth 0))
+                              (while $results
+                                (let (($top (car $results)))
+                                  (when (memq $top $l)
+                                    (setq $r (cons $top $r))))
+                                (setq $nth (1+ $nth))
+                                (setq $results (cdr $results)))
+                              (nreverse $r))))
+                    (cdr $match-total))))
+        (setq $match-lines-common $results))
+      ;; Culling all words match lines
+      (mapc (lambda ($l)
+              (goto-char $pos-min)
+              (forward-line (1- $l))
+              (let (($line-num (+ $l $from)))
+                (setq $lines
+                      (cons
+                       (propertize
+                        (buffer-substring (point) (1+ (point-at-eol)))
+                        'line-prefix
+                        (propertize
+                         (format $line-format $line-num)
+                         'face $line-face)
+                        'swl $line-num)
+                       $lines))))
+            $match-lines-common)
+      (cons $match-lines-common $lines))))
+(setq swoop-async-get-match-lines-list
+      (byte-compile 'swoop-async-get-match-lines-list))
+
+
+(cl-defun swoop-overlay-word ($pattern $buf)
+  (with-current-buffer $buf
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward $pattern nil t)
+        (if (swoop-async-old-session?) (cl-return-from stop1))
+        (let* (($beg (match-beginning 0))
+               ($end (match-end 0))
+               ($ov (make-overlay $beg $end)))
+          (if (eq $beg $end) (cl-return-from swoop-overlay-word))
+          (overlay-put $ov 'face 'swoop-face-target-words)
+          (overlay-put $ov 'swoop-temporary t)
+          (overlay-put $ov 'priority 20))))))
 
 
 (provide 'swoop-lib)

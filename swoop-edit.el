@@ -14,6 +14,7 @@
 
 ;;; Code:
 
+(require 'swoop-lib)
 
 (defvar swoop-edit-buffer "*Swoop Edit*")
 

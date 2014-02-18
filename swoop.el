@@ -53,8 +53,15 @@
 ;;; Code:
 
 (require 'swoop-lib)
-(require 'swoop-async)
 (require 'swoop-edit)
+
+;; Cache control
+(defun swoop-cache-clear ()
+  (when (not (ht-empty? swoop-buffer-info))
+    (ht-clear! swoop-buffer-info)
+    (swoop-async-kill-process)
+    (swoop-async-kill-process-buffer)))
+(add-hook 'after-save-hook 'swoop-cache-clear)
 
 ;; Cancel action
 (defvar swoop-abort-hook nil)
@@ -170,19 +177,7 @@ and execute functions listed in swoop-abort-hook"
   (overlay-put swoop-overlay-target-buffer-selection
                'face 'swoop-face-target-line)
   (overlay-put swoop-overlay-target-buffer-selection 'priority 15))
-(cl-defun swoop-overlay-word ($pattern $buf)
-  (with-current-buffer $buf
-    (save-excursion
-      (goto-char (point-min))
-      (while (re-search-forward $pattern nil t)
-        (if (swoop-async-old-session?) (cl-return-from stop1))
-        (let* (($beg (match-beginning 0))
-               ($end (match-end 0))
-               ($ov (make-overlay $beg $end)))
-          (if (eq $beg $end) (cl-return-from swoop-overlay-word))
-          (overlay-put $ov 'face 'swoop-face-target-words)
-          (overlay-put $ov 'swoop-temporary t)
-          (overlay-put $ov 'priority 20))))))
+
 
 
 (cl-defun swoop-core (&key $query $resume $multi)
@@ -401,9 +396,9 @@ and execute functions listed in swoop-abort-hook"
         (cond ((and (bobp) (eobp))
                nil)
               ((bobp)
-               (swoop-next-line))
+               (swoop-action-goto-line-next))
               ((eobp)
-               (swoop-prev-line)))
+               (swoop-action-goto-line-prev)))
         (swoop-line-move 'init)
         (swoop-header-format-line-set
          (get-text-property (point-at-bol) 'swb))))))
