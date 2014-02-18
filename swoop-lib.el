@@ -97,22 +97,30 @@
        $results)))
 
 ;; Move line up and down
-(defsubst swoop-move-line-within-target-window ($line-num $buf)
-  (with-selected-window swoop--target-window
-    (when (not (equal $buf swoop-last-selected-buffer))
-      (with-current-buffer $buf
-        (set-window-buffer nil $buf))
-      (swoop-header-format-line-set $buf))
-    (swoop-goto-line $line-num)
-    (recenter)
-    (move-overlay
-     swoop-overlay-target-buffer-selection
-     (point) (min (1+ (point-at-eol)) (point-max))
-     (get-buffer $buf))
-      (if swoop-use-target-magnifier:
-        (swoop-magnify-around-target))
-    (swoop-unveil-invisible-overlay)
-    (setq swoop-last-selected-buffer $buf)))
+(defsubst swoop-move-line-within-target-window ()
+  (let (($line-num (get-text-property (point) 'swl))
+        ($buf (get-text-property (point) 'swb)))
+    (cl-flet ((line-action
+               ()
+               (recenter)
+               (move-overlay
+                swoop-overlay-target-buffer-selection
+                (point) (min (1+ (point-at-eol)) (point-max))
+                (get-buffer $buf))
+               (if swoop-use-target-magnifier:
+                   (swoop-magnify-around-target))
+               (swoop-unveil-invisible-overlay)))
+      (with-selected-window swoop--target-window
+        (if (not (equal $buf swoop-last-selected-buffer))
+            (progn
+              (with-current-buffer $buf
+                (set-window-buffer nil $buf)
+                (swoop-goto-line $line-num)
+                (line-action))
+              (swoop-header-format-line-set $buf))
+          (swoop-goto-line $line-num)
+          (line-action))
+        (setq swoop-last-selected-buffer $buf)))))
 
 (defsubst swoop-forward-line ()
   (let ($po)
@@ -153,9 +161,7 @@
     (move-overlay
      swoop-overlay-buffer-selection
      (point) (min (1+ (point-at-eol)) (point-max)))
-    (swoop-move-line-within-target-window
-     (get-text-property (point-at-bol) 'swl)
-     (get-text-property (point-at-bol) 'swb))
+    (swoop-move-line-within-target-window)
     (recenter)))
 (defsubst swoop-next-line ()
   (interactive)
