@@ -377,7 +377,7 @@ and execute functions listed in swoop-abort-hook"
                (swoop-next-line))
               ((eobp)
                (swoop-prev-line)))
-        (swoop-move-line 'init)
+        (swoop-line-move 'init)
         (swoop-header-format-line-set
          (get-text-property (point-at-bol) 'swb))))))
 

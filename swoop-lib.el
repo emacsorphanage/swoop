@@ -30,7 +30,6 @@
 (defvar swoop-last-selected-buffer nil)
 (defvar swoop-last-selected-line nil)
 (defvar swoop-buffer-info (ht-create 'equal))
-;;(defvar swoop-buffer-info-cache nil)
 (defvar swoop-minibuffer-input-dilay 0)
 (defvar swoop-input-threshold 2)
 (defvar swoop-minibuffer-history nil)
@@ -100,7 +99,7 @@
        $results)))
 
 ;; Move line up and down
-(defsubst swoop-move-line-within-target-window ()
+(defsubst swoop-line-move-within-target-window ()
   (let (($line-num (get-text-property (point) 'swl))
         ($buf (get-text-property (point) 'swb)))
     (cl-labels ((line-action ()
@@ -124,7 +123,7 @@
           (line-action))
         (setq swoop-last-selected-buffer $buf)))))
 
-(defsubst swoop-forward-line ()
+(defsubst swoop-line-forward ()
   (let ($po)
     (if (get-text-property
          (setq $po (next-single-property-change (point) 'swl))
@@ -134,7 +133,7 @@
            (setq $po (next-single-property-change $po 'swl))
            'swl)
           (goto-char $po)))))
-(defsubst swoop-backward-line ()
+(defsubst swoop-line-backward ()
   (let ($po)
     (if (get-text-property
          (setq $po (previous-single-property-change (point) 'swl))
@@ -144,43 +143,43 @@
            (setq $po (previous-single-property-change $po 'swl))
            'swl)
           (goto-char $po)))))
-(cl-defun swoop-move-line ($direction)
+(cl-defun swoop-line-move ($direction)
   (with-selected-window swoop-window
     (cl-case $direction
-      (up     (swoop-backward-line))
-      (down   (swoop-forward-line))
+      (up     (swoop-line-backward))
+      (down   (swoop-line-forward))
       (top    (goto-char (point-min))
-              (swoop-forward-line))
+              (swoop-line-forward))
       (bottom (goto-char (point-max))
-              (swoop-backward-line))
+              (swoop-line-backward))
       (init (cond
              ((and (bobp) (eobp))
-              (cl-return-from swoop-move-line nil))
+              (cl-return-from swoop-line-move nil))
              ((bobp)
-              (swoop-forward-line)
+              (swoop-line-forward)
               (move-beginning-of-line 1))
              ((eobp)
-              (swoop-backward-line)
+              (swoop-line-backward)
               (move-beginning-of-line 1))
              (t (move-beginning-of-line 1))
              )))
     (move-overlay
      swoop-overlay-buffer-selection
      (point) (min (1+ (point-at-eol)) (point-max)))
-    (swoop-move-line-within-target-window)
+    (swoop-line-move-within-target-window)
     (recenter)))
 (defsubst swoop-action-goto-line-next ()
   (interactive)
-  (swoop-move-line 'down))
+  (swoop-line-move 'down))
 (defsubst swoop-action-goto-line-prev ()
   (interactive)
-  (swoop-move-line 'up))
+  (swoop-line-move 'up))
 (defsubst swoop-action-goto-line-top ()
   (interactive)
-  (swoop-move-line 'top))
+  (swoop-line-move 'top))
 (defsubst swoop-action-goto-line-bottom ()
   (interactive)
-  (swoop-move-line 'bottom))
+  (swoop-line-move 'bottom))
 
 ;; Window configuration
 (defcustom swoop-window-split-current-window: nil
@@ -404,12 +403,12 @@ swoop-overlay-target-buffer-selection moved."
       (unless (member $buf $bufs)
         (ht-remove! swoop-buffer-info $buf)))))
 
-(defun swoop-clear-cache ()
+(defun swoop-cache-clear ()
   (when (not (ht-empty? swoop-buffer-info))
     (ht-clear! swoop-buffer-info)
     (swoop-async-kill-process)
     (swoop-async-kill-process-buffer)))
-(add-hook 'after-save-hook 'swoop-clear-cache)
+(add-hook 'after-save-hook 'swoop-cache-clear)
 
 (defun swoop-buffer-info-get ($buf $key2)
   (ht-get (ht-get swoop-buffer-info $buf) $key2))
