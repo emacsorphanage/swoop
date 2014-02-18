@@ -243,8 +243,8 @@ the selected line position will be at the other side of the list."
 
 (defvar swoop-overlay-magnify-around-target-line nil)
 (cl-defun swoop-magnify-around-target
-    "Magnify lines around the target line."
     (&key ($around swoop-use-target-magnifier-around:)
+    "Magnify lines around the target line."
           ($size swoop-use-target-magnifier-size:)
           $delete $buffer)
   (with-selected-window swoop--target-window
