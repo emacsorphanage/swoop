@@ -4,6 +4,18 @@ Peculiar buffer navigation for Emacs.
 
 ![swoop.el](https://raw2.github.com/ShingoFukuyama/images/master/swoop.gif)
 
+## Feature:
+
+* Search words through a whole buffer or across buffers
+* Highlight target line and matched words
+* Stick to the nearest line even after update the list
+* Utilize PCRE (Perl Compatible Regular Expressions) like search
+* Utilize migemo (Japanese words search command)
+* Edit matched lines synchronously
+* Cache buffer information to start quickly
+* Shrink text size in buffers to view more
+* and more
+
 ## Config example
 
 ```
