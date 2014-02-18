@@ -7,7 +7,7 @@
 ;; URL: https://github.com/ShingoFukuyama/swoop
 ;; Created: Feb 14 2014
 ;; Keywords: swoop inner buffer search navigation
-;; Package-Requires: ((pcre2el "1.5") (async "1.1") (emacs "24"))
+;; Package-Requires: ((ht "2.0") (pcre2el "1.5") (async "1.1") (emacs "24"))
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
