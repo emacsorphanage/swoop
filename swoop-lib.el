@@ -69,7 +69,7 @@
   "Currently selecting buffer name which appears on the header line"
   :group 'swoop)
 (defface swoop-face-line-buffer-name
-  '((t :height 1.5 :background "#333333" :foreground "#eeeeee" :weight bold))
+  '((t :height 1.5 :background "#0099cc" :foreground "#111111" :weight bold))
   "Buffer name line face"
   :group 'swoop)
 (defface swoop-face-line-number
@@ -79,7 +79,7 @@
 (defvar swoop-face-line-number 'swoop-face-line-number
   "For pass to async batch")
 
-(defcustom swoop-use-target-magnifier: t
+(defcustom swoop-use-target-magnifier: nil
   "Magnify around target line font size"
   :group 'swoop :type 'boolean)
 (defcustom swoop-use-target-magnifier-around: 7

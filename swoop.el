@@ -372,9 +372,7 @@ and execute functions listed in swoop-abort-hook"
                            (concat
                             (propertize
                              (concat $buf "\n")
-                             'face
-                             `(:height 1.3 :background "#0099cc" :foreground "#222222")
-                             'swoop-header t
+                             'face 'swoop-face-line-buffer-name
                              'swd (if (equal $buf swoop-last-selected-buffer) t nil))
                             $con)))
                    (setq $cont (concat $cont $con))))
