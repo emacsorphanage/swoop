@@ -244,9 +244,9 @@ the selected line position will be at the other side of the list."
 (defvar swoop-overlay-magnify-around-target-line nil)
 (cl-defun swoop-magnify-around-target
     (&key ($around swoop-use-target-magnifier-around:)
-    "Magnify lines around the target line."
           ($size swoop-use-target-magnifier-size:)
           $delete $buffer)
+  "Magnify lines around the target line."
   (with-selected-window swoop--target-window
     (cond ((not swoop-overlay-magnify-around-target-line)
            (setq swoop-overlay-magnify-around-target-line
@@ -521,8 +521,8 @@ swoop-overlay-target-buffer-selection moved."
         (process-list)))
 
 (defun swoop-async-get-match-lines-list
-  "Distributed processing by async.el"
   ($query $from $line-format $line-face $buf)
+  "Distributed processing by async.el"
   ;; Prevent "Odd length text property list" error
   (setq vc-handled-backends nil)
   (save-excursion
