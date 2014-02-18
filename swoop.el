@@ -207,7 +207,6 @@ and execute functions listed in swoop-abort-hook"
       (swoop-async-kill-process-buffer)
       (if swoop-overlay-target-buffer
           (delete-overlay swoop-overlay-target-buffer))
-      (ht-clear! swoop-buffer-info)
       ;; Restore last position of other buffers
       (when $multi
         (swoop-mapc $buf (ht-keys swoop-buffer-info)

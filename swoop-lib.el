@@ -30,6 +30,7 @@
 (defvar swoop-last-selected-buffer nil)
 (defvar swoop-last-selected-line nil)
 (defvar swoop-buffer-info (ht-create 'equal))
+;;(defvar swoop-buffer-info-cache nil)
 (defvar swoop-minibuffer-input-dilay 0)
 (defvar swoop-input-threshold 2)
 (defvar swoop-minibuffer-history nil)
@@ -43,6 +44,11 @@
 (defvar swoop--target-buffer-info nil)
 (defvar swoop--target-last-position nil)
 (defvar swoop--target-last-line nil)
+
+(defun swoop-clear-cache ()
+  (if (not (ht-empty? swoop-buffer-info))
+      (ht-clear! swoop-buffer-info)))
+(add-hook 'after-save-hook 'swoop-clear-cache)
 
 (defvar swoop-map
   (let ((map (make-sparse-keymap)))
@@ -100,16 +106,15 @@
 (defsubst swoop-move-line-within-target-window ()
   (let (($line-num (get-text-property (point) 'swl))
         ($buf (get-text-property (point) 'swb)))
-    (cl-flet ((line-action
-               ()
-               (recenter)
-               (move-overlay
-                swoop-overlay-target-buffer-selection
-                (point) (min (1+ (point-at-eol)) (point-max))
-                (get-buffer $buf))
-               (if swoop-use-target-magnifier:
-                   (swoop-magnify-around-target))
-               (swoop-unveil-invisible-overlay)))
+    (cl-labels ((line-action ()
+                             (recenter)
+                             (move-overlay
+                              swoop-overlay-target-buffer-selection
+                              (point) (min (1+ (point-at-eol)) (point-max))
+                              (get-buffer $buf))
+                             (if swoop-use-target-magnifier:
+                                 (swoop-magnify-around-target))
+                             (swoop-unveil-invisible-overlay)))
       (with-selected-window swoop--target-window
         (if (not (equal $buf swoop-last-selected-buffer))
             (progn
@@ -384,12 +389,10 @@ swoop-overlay-target-buffer-selection moved."
 (defun swoop-set-buffer-info-all ()
   (let (($bufs (swoop-multi-get-buffer-list)))
     (swoop-mapc $buf $bufs
-      ;; (unless (and (member $buf (ht-keys swoop-buffer-info))
-      ;;              ;;(not (with-current-buffer $buf (buffer-modified-p)))
-      ;;              )
-        (swoop-set-buffer-info $buf)
-        ;; )
-      )
+      (if (member $buf (ht-keys swoop-buffer-info))
+          (if (with-current-buffer $buf (buffer-modified-p))
+              (swoop-set-buffer-info $buf))
+        (swoop-set-buffer-info $buf)))
     (swoop-mapc $buf (ht-keys swoop-buffer-info)
       (unless (member $buf $bufs)
         (ht-remove! swoop-buffer-info $buf)))))
@@ -407,12 +410,12 @@ swoop-overlay-target-buffer-selection moved."
 (defun swoop-nearest-line ($target $list)
   (when (and $target $list)
     (let ($result)
-      (cl-flet ((filter ($fn $elem $list)
-                        (let ($r)
-                          (mapc (lambda ($e)
-                                  (if (funcall $fn $elem $e)
-                                      (setq $r (cons $e $r))))
-                                $list) $r)))
+      (cl-labels ((filter ($fn $elem $list)
+                          (let ($r)
+                            (mapc (lambda ($e)
+                                    (if (funcall $fn $elem $e)
+                                        (setq $r (cons $e $r))))
+                                  $list) $r)))
         (if (eq 1 (length $list))
             (setq $result (car $list))
           (let* (($lt (car
