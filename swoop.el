@@ -111,7 +111,7 @@ and execute functions listed in swoop-abort-hook"
      (with-selected-window swoop--target-window
        (with-current-buffer (cdr $info)
          (set-window-buffer nil (cdr $info))
-         (goto-char (car $info))
+         (swoop-goto-line (car $info))
          (save-excursion
            (re-search-forward
             (concat
@@ -123,16 +123,17 @@ and execute functions listed in swoop-abort-hook"
          ;; Highlight for few seconds after jump
          (let* (($lbeg (point-at-bol))
                 ($lend (point-at-eol))
-                ($lov (make-overlay $lbeg $lend))
+                ($lov  (make-overlay $lbeg $lend))
                 ($wbeg (match-beginning 0))
                 ($wend (match-end 0))
-                ($wov (make-overlay $wbeg $wend)))
+                ($wov  (make-overlay $wbeg $wend)))
            (run-with-timer 0.28 nil (lambda ($o) (delete-overlay $o)) $lov)
            (overlay-put $lov 'face 'swoop-face-target-words)
            (run-with-timer 0.4 nil (lambda ($o) (delete-overlay $o)) $wov)
            (overlay-put $wov 'face 'swoop-face-target-line)
            (recenter)))))
-   (with-selected-window swoop--target-window (cons (point) (current-buffer))))
+   (with-selected-window swoop-window
+     (cons (get-text-property (point) 'swl) (get-text-property (point) 'swb))))
   (exit-minibuffer))
 
 ;; Overlay

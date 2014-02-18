@@ -153,7 +153,6 @@ the selected line position will be at the other side of the list."
           (line-action))
         (setq swoop-last-selected-buffer $buf)))))
 
-
 (defsubst swoop-action-goto-line-next ()
   (interactive)
   (swoop-line-move 'down))
@@ -205,8 +204,7 @@ the selected line position will be at the other side of the list."
              ((eobp)
               (swoop-line-backward)
               (move-beginning-of-line 1))
-             (t (move-beginning-of-line 1))
-             )))
+             (t (move-beginning-of-line 1)))))
     (move-overlay
      swoop-overlay-buffer-selection
      (point) (min (1+ (point-at-eol)) (point-max)))
@@ -323,6 +321,8 @@ the selected line position will be at the other side of the list."
    ((and swoop-use-migemo
          (not swoop-use-pcre))
     (setq $input (swoop-migemo-convert $input)))
+   ((string-match "^\\\\b$" $input) (setq $input nil))
+   ((string-match "[^\\]\\\\$" $input) (setq $input nil))
    (t $input))
   $input)
 
@@ -431,7 +431,6 @@ swoop-overlay-target-buffer-selection moved."
   (ht-map (lambda (ignored $binfo)
             (ht-get $binfo $key))
           swoop-buffer-info))
-
 
 ;; (swoop-nearest-line 50 '(10 90 20 80 30 40 45 56 70))
 (defun swoop-nearest-line ($target $list)
