@@ -122,26 +122,28 @@ and execute functions listed in swoop-abort-hook"
 
 ;; Overlay
 (cl-defun swoop-overlay-clear (&key $to-empty $kill $multi)
-  (swoop-mapc $buf (if $multi
-                      (ht-keys swoop-buffer-info)
-                      (list swoop--target-buffer))
-    (if (swoop-async-old-session?) (cl-return-from swoop-overlay-clear))
-    (when (get-buffer swoop-buffer)
-      (with-current-buffer $buf
-        (swoop-mapc $ov (overlays-in (point-min) (point-max))
-          (if (swoop-async-old-session?) (cl-return))
-          (when (overlay-get $ov 'swoop-temporary)
-            (delete-overlay $ov))))))
   (if swoop-use-target-magnifier:
       (swoop-magnify-around-target :$delete t))
-  (unless $to-empty
-    (if swoop-overlay-target-buffer-selection
-        (delete-overlay swoop-overlay-target-buffer-selection))
-    (unless $kill
-      (if swoop-overlay-buffer-selection
-          (delete-overlay swoop-overlay-buffer-selection))))
+  (if (and swoop-overlay-target-buffer-selection
+           (not $to-empty))
+      (delete-overlay swoop-overlay-target-buffer-selection))
   (if (and $kill (get-buffer swoop-buffer))
-      (kill-buffer swoop-buffer)))
+      (kill-buffer swoop-buffer))
+  (swoop-mapc $buf (if $multi
+                       (ht-keys swoop-buffer-info)
+                     (list swoop--target-buffer))
+    (if (and (swoop-async-old-session?)
+             (not $to-empty)
+             (not $kill))
+        (cl-return-from swoop-overlay-clear))
+    (with-current-buffer $buf
+      (swoop-mapc $ov (overlays-in (point-min) (point-max))
+        (if (and (swoop-async-old-session?)
+                 (not $to-empty)
+                 (not $kill))
+            (cl-return))
+        (when (overlay-get $ov 'swoop-temporary)
+          (delete-overlay $ov))))))
 (defsubst swoop-overlay-selection-buffer-set ()
   (setq swoop-overlay-buffer-selection
         (make-overlay (point-at-bol)
@@ -288,7 +290,9 @@ and execute functions listed in swoop-abort-hook"
     (setq swoop-last-query-converted $query)
     (with-current-buffer swoop-buffer
       (if (not $query)
-          (swoop-overlay-clear :$to-empty t :$multi $multi)
+          (progn
+            (swoop-overlay-clear :$to-empty t :$multi $multi)
+            (princ "aaaaaaaifoooooooiejowijf"))
         (swoop-async-divider $query $multi)))))
 
 (defun swoop-async-checker ($result $tots $pattern $multi)

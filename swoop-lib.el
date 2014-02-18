@@ -318,15 +318,6 @@ swoop-overlay-target-buffer-selection moved."
         (setq swoop-invisible-targets
               (cons (cons $ov $type) swoop-invisible-targets))))))
 
-;; (defun swoop-get-point-from-line ($line &optional $buf)
-;;   (or $buf (setq $buf (current-buffer)))
-;;   (save-excursion
-;;     (with-current-buffer $buf
-;;       (swoop-goto-line $line)
-;;       ;; Must subtract 1 for extract buffer contents,
-;;       ;; by substring-no-properties
-;;       (1- (point)))))
-
 (defun swoop-set-buffer-info ($buf)
   (with-current-buffer $buf
     (let* (($buf-content    (buffer-substring-no-properties
@@ -371,12 +362,6 @@ swoop-overlay-target-buffer-selection moved."
                 ("divide-by"               $by)))
       (ht-set swoop-buffer-info $buf swoop--target-buffer-info)))
   nil)
-
-;; (defsubst swoop-hash-values-to-list ($hash)
-;;   (let ($results)
-;;     (maphash (lambda (ignored $val)
-;;                (setq $results (cons $val $results))) $hash)
-;;     $results))
 
 (defvar swoop-multi-ignore-buffers-match "^\\*"
   "Regexp to eliminate buffers you don't want to see")
@@ -424,9 +409,10 @@ swoop-overlay-target-buffer-selection moved."
             (ht-get $binfo $key))
           swoop-buffer-info))
 
-
-;;(swoop-nearest-line 50 '(10 90 20 80 30 40 45 56 70))
+
+;; (swoop-nearest-line 50 '(10 90 20 80 30 40 45 56 70))
 (defun swoop-nearest-line ($target $list)
+  "Return nearest number of $target out of $list."
   (when (and $target $list)
     (let ($result)
       (cl-labels ((filter ($fn $elem $list)
