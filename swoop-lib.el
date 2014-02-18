@@ -45,17 +45,14 @@
 (defvar swoop--target-last-position nil)
 (defvar swoop--target-last-line nil)
 
-(defun swoop-clear-cache ()
-  (if (not (ht-empty? swoop-buffer-info))
-      (ht-clear! swoop-buffer-info)))
-(add-hook 'after-save-hook 'swoop-clear-cache)
-
 (defvar swoop-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
-    (define-key map (kbd "C-n") 'swoop-next-line)
-    (define-key map (kbd "C-p") 'swoop-prev-line)
+    (define-key map (kbd "C-n") 'swoop-action-goto-line-next)
+    (define-key map (kbd "C-p") 'swoop-action-goto-line-prev)
     (define-key map (kbd "C-g") 'swoop-action-cancel)
+    (define-key map (kbd "M-<") 'swoop-action-goto-line-top)
+    (define-key map (kbd "M->") 'swoop-action-goto-line-bottom)
     (define-key map (kbd "RET") 'swoop-action-goto-target-point)
     (define-key map (kbd "<C-return>") 'swoop-action-goto-target-point)
     map))
@@ -150,8 +147,12 @@
 (cl-defun swoop-move-line ($direction)
   (with-selected-window swoop-window
     (cl-case $direction
-      (up   (swoop-backward-line))
-      (down (swoop-forward-line))
+      (up     (swoop-backward-line))
+      (down   (swoop-forward-line))
+      (top    (goto-char (point-min))
+              (swoop-forward-line))
+      (bottom (goto-char (point-max))
+              (swoop-backward-line))
       (init (cond
              ((and (bobp) (eobp))
               (cl-return-from swoop-move-line nil))
@@ -168,12 +169,18 @@
      (point) (min (1+ (point-at-eol)) (point-max)))
     (swoop-move-line-within-target-window)
     (recenter)))
-(defsubst swoop-next-line ()
+(defsubst swoop-action-goto-line-next ()
   (interactive)
   (swoop-move-line 'down))
-(defsubst swoop-prev-line ()
+(defsubst swoop-action-goto-line-prev ()
   (interactive)
   (swoop-move-line 'up))
+(defsubst swoop-action-goto-line-top ()
+  (interactive)
+  (swoop-move-line 'top))
+(defsubst swoop-action-goto-line-bottom ()
+  (interactive)
+  (swoop-move-line 'bottom))
 
 ;; Window configuration
 (defcustom swoop-window-split-current-window: nil
@@ -396,6 +403,13 @@ swoop-overlay-target-buffer-selection moved."
     (swoop-mapc $buf (ht-keys swoop-buffer-info)
       (unless (member $buf $bufs)
         (ht-remove! swoop-buffer-info $buf)))))
+
+(defun swoop-clear-cache ()
+  (when (not (ht-empty? swoop-buffer-info))
+    (ht-clear! swoop-buffer-info)
+    (swoop-async-kill-process)
+    (swoop-async-kill-process-buffer)))
+(add-hook 'after-save-hook 'swoop-clear-cache)
 
 (defun swoop-buffer-info-get ($buf $key2)
   (ht-get (ht-get swoop-buffer-info $buf) $key2))

@@ -204,7 +204,6 @@ and execute functions listed in swoop-abort-hook"
           (swoop-minibuffer-read-from-string $query $multi))
       (when (get-buffer swoop-buffer)
         (swoop-overlay-clear :$kill t :$multi $multi))
-      (swoop-async-kill-process-buffer)
       (if swoop-overlay-target-buffer
           (delete-overlay swoop-overlay-target-buffer))
       ;; Restore last position of other buffers
