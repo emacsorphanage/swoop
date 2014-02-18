@@ -48,7 +48,7 @@ ht.el       https://github.com/Wilfred/ht.el
 ### Window configuration
 ```
 ;; t:   Show swoop lines within the current window
-;; nil: Show swoop lines without the current window
+;; nil: Show swoop lines in another window
 (setq swoop-window-split-current-window: nil)
 ;; Determine the split direction 'split-window-horizontally or 'split-window-vertically
 (setq swoop-window-split-direction: 'split-window-vertically)

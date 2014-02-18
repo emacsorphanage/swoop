@@ -214,7 +214,8 @@ and execute functions listed in swoop-abort-hook"
             (setq swoop-minibuf-last-content $query)
             ;; First time
             (if (or (listp $query) $resume)
-                (swoop-update swoop-last-query-converted $multi)
+                (if (not (equal "" $query))
+                    (swoop-update swoop-last-query-converted $multi))
               (swoop-update (split-string $query " " t) $multi)))
           (swoop-minibuffer-read-from-string $query $multi))
       (when (get-buffer swoop-buffer)
