@@ -357,7 +357,8 @@ and execute functions listed in swoop-abort-hook"
                        ($length (length $val)))
                    (if (eq 1 $length)
                        (progn
-                         (setq $con (mapconcat 'identity (cddar $val) ""))
+                         (setq $con (mapconcat 'identity
+                                               (cdr (cdr (car $val))) ""))
                          (if (equal $buf swoop-last-selected-buffer)
                              (setq $match-lines-common (nth 1 (car $val)))))
                      (swoop-mapc $p (cl-sort $val 'string< :key 'car)
