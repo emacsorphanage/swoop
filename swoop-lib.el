@@ -99,6 +99,11 @@
        $results)))
 
 ;; Move line up and down
+(defcustom swoop-line-move-loop: t
+  "If the selected line is at one of the edges of the list, and move further,
+the selected line position will be at the other side of the list."
+  :group 'swoop :type 'boolean)
+
 (defsubst swoop-line-move-within-target-window ()
   (let (($line-num (get-text-property (point) 'swl))
         ($buf (get-text-property (point) 'swb)))
@@ -124,25 +129,26 @@
         (setq swoop-last-selected-buffer $buf)))))
 
 (defsubst swoop-line-forward ()
-  (let ($po)
-    (if (get-text-property
-         (setq $po (next-single-property-change (point) 'swl))
-         'swl)
-        (goto-char $po)
-      (if (get-text-property
-           (setq $po (next-single-property-change $po 'swl))
-           'swl)
-          (goto-char $po)))))
+  (let (($po (next-single-property-change (point) 'swl)))
+    (if $po
+        (if (get-text-property $po 'swl)
+            (goto-char $po)
+          (let (($over-header (next-single-property-change $po 'swl)))
+            (if (get-text-property $over-header 'swl)
+                (goto-char $over-header))))
+      ;; Loop
+      (if swoop-line-move-loop:
+          (swoop-line-move 'top)))))
 (defsubst swoop-line-backward ()
-  (let ($po)
-    (if (get-text-property
-         (setq $po (previous-single-property-change (point) 'swl))
-         'swl)
-        (goto-char $po)
-      (if (get-text-property
-           (setq $po (previous-single-property-change $po 'swl))
-           'swl)
-          (goto-char $po)))))
+  (let (($po (previous-single-property-change (point) 'swl)))
+    (if $po
+        (if (get-text-property $po 'swl)
+            (goto-char $po)
+          (let (($over-header (previous-single-property-change $po 'swl)))
+            (if (get-text-property $over-header 'swl)
+                (goto-char $over-header))))
+      (if swoop-line-move-loop:
+          (swoop-line-move 'bottom)))))
 (cl-defun swoop-line-move ($direction)
   (with-selected-window swoop-window
     (cl-case $direction
