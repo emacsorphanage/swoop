@@ -122,13 +122,26 @@ and execute functions listed in swoop-abort-hook"
 
 ;; Overlay
 (cl-defun swoop-overlay-clear (&key $to-empty $kill $multi)
+  (if (and $kill (get-buffer swoop-buffer))
+      (kill-buffer swoop-buffer))
   (if swoop-use-target-magnifier:
       (swoop-magnify-around-target :$delete t))
   (if (and swoop-overlay-target-buffer-selection
            (not $to-empty))
       (delete-overlay swoop-overlay-target-buffer-selection))
-  (if (and $kill (get-buffer swoop-buffer))
-      (kill-buffer swoop-buffer))
+  (when (and swoop-font-size-change:
+             $kill
+             (not $multi)
+             (eq 1 (length swoop-overlay-target-buffer)))
+    (delete-overlay (car swoop-overlay-target-buffer))
+    (setq swoop-overlay-target-buffer nil))
+  (when (and swoop-font-size-change:
+             $kill
+             $multi
+             (< 1 (length swoop-overlay-target-buffer)))
+    (swoop-mapc $ov swoop-overlay-target-buffer
+      (delete-overlay $ov))
+    (setq swoop-overlay-target-buffer nil))
   (swoop-mapc $buf (if $multi
                        (ht-keys swoop-buffer-info)
                      (list swoop--target-buffer))
@@ -181,7 +194,7 @@ and execute functions listed in swoop-abort-hook"
   (if $multi
       (swoop-set-buffer-info-all)
     (swoop-set-buffer-info swoop--target-buffer))
-
+  (swoop-overlay-font-size-change $multi)
   (swoop-overlay-selection-target-buffer-set)
   (save-window-excursion
     (progn
@@ -205,9 +218,7 @@ and execute functions listed in swoop-abort-hook"
               (swoop-update (split-string $query " " t) $multi)))
           (swoop-minibuffer-read-from-string $query $multi))
       (when (get-buffer swoop-buffer)
-        (swoop-overlay-clear :$kill t :$multi $multi))
-      (if swoop-overlay-target-buffer
-          (delete-overlay swoop-overlay-target-buffer))
+        (swoop-overlay-clear :$kill t :$multi (or $multi nil)))
       ;; Restore last position of other buffers
       (when $multi
         (swoop-mapc $buf (ht-keys swoop-buffer-info)
@@ -303,9 +314,7 @@ and execute functions listed in swoop-abort-hook"
     (setq swoop-last-query-converted $query)
     (with-current-buffer swoop-buffer
       (if (not $query)
-          (progn
-            (swoop-overlay-clear :$to-empty t :$multi $multi)
-            (princ "aaaaaaaifoooooooiejowijf"))
+          (swoop-overlay-clear :$to-empty t :$multi $multi)
         (swoop-async-divider $query $multi)))))
 
 (defun swoop-async-checker ($result $tots $pattern $multi)

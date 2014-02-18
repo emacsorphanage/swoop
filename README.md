@@ -41,6 +41,39 @@ pcre2el.el  https://github.com/joddie/pcre2el
 
 ht.el       https://github.com/Wilfred/ht.el
 
+## Options
+
+### Window configuration
+```
+;; t:   Show swoop lines within the current window
+;; nil: Show swoop lines without the current window
+(setq swoop-window-split-current-window: nil)
+;; Determine the split direction 'split-window-horizontally or 'split-window-vertically
+(setq swoop-window-split-direction: 'split-window-vertically)
+```
+
+
+### Font size change
+```
+;; Change whole buffer's font size (t or nil)
+(setq swoop-font-size-change: t)
+;; Font size (e.g. 0.8, 1.0, 1.5, 80, 135)
+(setq swoop-font-size: 0.9)
+```
+
+
+### Magnify around target line
+```
+;;
+;; Enable around target lines magnifier (t or nil)
+(setq swoop-use-target-magnifier: t)
+;; Magnify area from target line
+(setq swoop-use-target-magnifier-around: 10)
+;; Font size for magnify area (e.g. 0.8, 1.0, 1.5, 80, 135)
+(setq swoop-use-target-magnifier-size: 1.2)
+```
+
+
 ## Option for Japanese match by cmigemo command
 
 ```

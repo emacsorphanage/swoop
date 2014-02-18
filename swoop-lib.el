@@ -114,7 +114,7 @@ the selected line position will be at the other side of the list."
                               (point) (min (1+ (point-at-eol)) (point-max))
                               (get-buffer $buf))
                              (if swoop-use-target-magnifier:
-                                 (swoop-magnify-around-target))
+                                 (swoop-magnify-around-target :$buffer $buf))
                              (swoop-unveil-invisible-overlay)))
       (with-selected-window swoop--target-window
         (if (not (equal $buf swoop-last-selected-buffer))
@@ -206,20 +206,43 @@ the selected line position will be at the other side of the list."
     (switch-to-buffer $buf))
   "Determine how to deploy swoop window")
 
-;; Whole buffer font size change
-(defun swoop-overlay-font-size-change (&optional $multi)
-  (setq swoop-overlay-target-buffer (make-overlay (point-min) (point-max)))
-  (overlay-put swoop-overlay-target-buffer 'face `(:height ,swoop-font-size-change:)))
-
-;; Font size change
-(defcustom swoop-font-size-change: 0.9
-  "Change fontsize temporarily during swoop."
+;; Font size manipulation
+(defcustom swoop-font-size-change: t
+  "Change font size temporarily during swoop."
+  :group 'swoop :type 'boolean)
+(defcustom swoop-font-size: 0.9
+  "Specify font size if `swoop-font-size-change:' is not nil."
   :group 'swoop :type 'number)
-(defcustom swoop-use-target-magnifier: nil
+(defun swoop-overlay-font-size-change (&optional $multi)
+  (when swoop-font-size-change:
+    (let (($ov (make-overlay (point-min) (point-max))))
+      (setq swoop-overlay-target-buffer (cons $ov nil))
+      (overlay-put $ov 'face `(:height ,swoop-font-size:)))
+    (recenter)
+    (when $multi
+      (swoop-mapc $b (ht-keys swoop-buffer-info)
+        (unless (equal swoop--target-buffer $b)
+          (with-current-buffer $b
+            (let (($ov (make-overlay (point-min) (point-max))))
+              (setq swoop-overlay-target-buffer
+                    (cons $ov swoop-overlay-target-buffer))
+              (overlay-put $ov 'face `(:height ,swoop-font-size:)))))))))
+
+
+(defcustom swoop-use-target-magnifier: t
+  "Magnify around target line font size"
+  :group 'swoop :type 'boolean)
+(defcustom swoop-use-target-magnifier-around: 10
+  "Magnify around target line font size"
+  :group 'swoop :type 'boolean)
+(defcustom swoop-use-target-magnifier-size: 1.2
   "Magnify around target line font size"
   :group 'swoop :type 'boolean)
 (defvar swoop-overlay-magnify-around-target-line nil)
-(cl-defun swoop-magnify-around-target (&key ($around 10) ($size 1.2) $delete)
+(cl-defun swoop-magnify-around-target
+    (&key ($around swoop-use-target-magnifier-around:)
+          ($size swoop-use-target-magnifier-size:)
+          $delete $buffer)
   (with-selected-window swoop--target-window
     (cond ((not swoop-overlay-magnify-around-target-line)
            (setq swoop-overlay-magnify-around-target-line
@@ -235,7 +258,8 @@ the selected line position will be at the other side of the list."
           (t (move-overlay
               swoop-overlay-magnify-around-target-line
               (point-at-bol (- 0 $around))
-              (point-at-bol $around))))))
+              (point-at-bol $around)
+              (get-buffer $buffer))))))
 
 (defsubst swoop-goto-line ($line)
   (goto-char (point-min))
