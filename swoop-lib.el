@@ -82,7 +82,7 @@
 (defcustom swoop-use-target-magnifier: t
   "Magnify around target line font size"
   :group 'swoop :type 'boolean)
-(defcustom swoop-use-target-magnifier-around: 10
+(defcustom swoop-use-target-magnifier-around: 7
   "Magnify around target line font size"
   :group 'swoop :type 'boolean)
 (defcustom swoop-use-target-magnifier-size: 1.2

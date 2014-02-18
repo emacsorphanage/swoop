@@ -2,6 +2,8 @@
 
 Peculiar buffer navigation for Emacs.
 
+![swoop.el](https://raw2.github.com/ShingoFukuyama/images/master/swoop.gif)
+
 ## Config example
 
 ```
