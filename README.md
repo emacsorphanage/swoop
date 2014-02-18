@@ -4,7 +4,7 @@ Peculiar buffer navigation for Emacs.
 
 ![swoop.el](https://raw2.github.com/ShingoFukuyama/images/master/swoop.gif)
 
-## Feature:
+## Feature
 
 * Search words through a whole buffer or across buffers
 * Highlight target line and matched words
