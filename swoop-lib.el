@@ -578,6 +578,8 @@ swoop-overlay-target-buffer-selection moved."
                         'swl $line-num)
                        $lines))))
             $match-lines-common)
+      (setq $match-lines-common
+            (mapcar (lambda ($ln) (+ $ln $from)) $match-lines-common))
       (cons $match-lines-common $lines))))
 (setq swoop-async-get-match-lines-list
       (byte-compile 'swoop-async-get-match-lines-list))

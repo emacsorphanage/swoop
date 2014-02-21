@@ -391,7 +391,7 @@ Ignore non file buffer."
                          (setq $con (concat $con (mapconcat 'identity (cddr $p) "")))
                          (if (equal $buf swoop-last-selected-buffer)
                              (setq $match-lines-common
-                                   (append (nth 1 (car $val)) $match-lines-common))))))
+                                   (append (nth 1 $p) $match-lines-common))))))
                    (when (not (equal "" $con))
                      (setq $con
                            (concat
