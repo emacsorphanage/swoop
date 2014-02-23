@@ -37,6 +37,8 @@
 (defvar swoop-last-query-converted nil)
 (defvar swoop-last-pattern nil)
 (defvar swoop-minibuf-last-content nil)
+(defvar swoop-parameters (ht-create 'equal)
+  "To hand over current state to swoop-multi")
 
 (defvar swoop--target-buffer nil)
 (defvar swoop--target-window nil)
@@ -76,8 +78,8 @@
   '((t :foreground "#ff9900"))
   "Line number face"
   :group 'swoop)
-(defvar swoop-face-line-number 'swoop-face-line-number
-  "For pass to async batch")
+(defvar swoop-n 'swoop-face-line-number
+  "Abbreviate name in order to reduce async transfer size")
 
 (defcustom swoop-use-target-magnifier: nil
   "Magnify around target line font size"
@@ -520,7 +522,7 @@ swoop-overlay-target-buffer-selection moved."
         (process-list)))
 
 (defun swoop-async-get-match-lines-list
-  ($query $from $line-format $line-face $buf)
+  ($query $from $line-format $line-face $buf &optional $pre-select)
   "Distributed processing by async.el"
   ;; Prevent "Odd length text property list" error
   (setq vc-handled-backends nil)
@@ -530,7 +532,17 @@ swoop-overlay-target-buffer-selection moved."
            ($pos-max (point-max))
            (buffer-invisibility-spec nil)
            ($match-lines)
-           ($match-total)
+           ($match-total
+            (if $pre-select
+                (let (($max-line (line-number-at-pos $pos-max)))
+                  (cons
+                   (sort (delq nil (mapcar (lambda ($n)
+                                             (if (and (> $n $from)
+                                                      (<= $n (+ $max-line $from)))
+                                                 (- $n $from)))
+                                           $pre-select))
+                         '>)
+                   nil))))
            ($match-lines-common))
       (goto-char $pos-min)
       (put-text-property $pos-min $pos-max 'swb $buf)

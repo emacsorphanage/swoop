@@ -199,7 +199,7 @@ and execute functions listed in swoop-abort-hook"
 
 
 
-(cl-defun swoop-core (&key $query $resume $multi)
+(cl-defun swoop-core (&key $query $reserve $resume $multi $pre-select)
   (setq
    swoop--target-last-position (point)
    swoop--target-last-line (line-number-at-pos)
@@ -210,6 +210,10 @@ and execute functions listed in swoop-abort-hook"
     (swoop-set-buffer-info swoop--target-buffer))
   (swoop-overlay-font-size-change $multi)
   (swoop-overlay-selection-target-buffer-set)
+  (setq swoop-parameters
+        (ht ("reserve" $reserve)
+            ("pcre" swoop-use-pcre)
+            ("migemo" swoop-use-migemo)))
   (save-window-excursion
     (progn
       (funcall swoop-display-function swoop-buffer)
@@ -229,9 +233,23 @@ and execute functions listed in swoop-abort-hook"
             ;; First time
             (if (or (listp $query) $resume)
                 (if (not (equal "" $query))
-                    (swoop-update swoop-last-query-converted $multi))
-              (swoop-update (split-string $query " " t) $multi)))
-          (swoop-minibuffer-read-from-string $query $multi))
+                    (swoop-update :$query swoop-last-query-converted
+                                  :$reserve $reserve
+                                  :$multi $multi
+                                  :$pre-select $pre-select))
+              (swoop-update :$query (split-string $query " " t)
+                            :$reserve $reserve
+                            :$multi $multi
+                            :$pre-select $pre-select)))
+          (when (or $reserve $pre-select)
+            (swoop-update :$query ""
+                          :$reserve $reserve
+                          :$multi $multi
+                          :$pre-select $pre-select))
+          (swoop-minibuffer-read-from-string :$query $query
+                                             :$reserve $reserve
+                                             :$multi $multi
+                                             :$pre-select $pre-select))
       (when (get-buffer swoop-buffer)
         (swoop-overlay-clear :$kill t :$multi (or $multi nil)))
       ;; Restore last position of other buffers
@@ -240,7 +258,8 @@ and execute functions listed in swoop-abort-hook"
           (unless (equal $buf (buffer-name (current-buffer)))
             (goto-char (swoop-buffer-info-get $buf "point")))))
       (setq swoop-use-pcre nil)
-      (setq swoop-use-migemo nil))))
+      (setq swoop-use-migemo nil)
+      (ht-clear! swoop-parameters))))
 
 (defcustom swoop-pre-input-point-at-function:
   (lambda () (thing-at-point 'symbol))
@@ -294,7 +313,7 @@ Ignore non file buffer."
 (defun swoop-line-length-over80 ()
   "Get over 80 colomn number linees."
   (interactive)
-  (swoop-core :$query "^[^\n]\\{80,\\}"))
+  (swoop-core :$reserve "^[^\n]\\{80,\\}"))
 ;;;###autoload
 (defun swoop-from-isearch ()
   "During isearch, switch over to swoop."
@@ -304,14 +323,31 @@ Ignore non file buffer."
                         (regexp-quote isearch-string))))
 ;; (define-key isearch-mode-map (kbd "C-o") 'swoop-from-isearch)
 
+;;;###autoload
+(defun swoop-function ()
+  "Show function list in buffer judging from major-mode and regexp.
+Currently c-mode only."
+  (interactive)
+  (swoop-core :$reserve
+              (cl-case major-mode
+                (c-mode "^\\([[:alpha:]_][[:alnum:]_:<>~]*\\)[ ]*"))))
+
 (defun swoop-multi-from-swoop ()
   "During swoop, switch over to swoop-multi."
   (interactive)
-  (let (($last-query swoop-minibuf-last-content))
+  (let (($last-query swoop-minibuf-last-content)
+        ($reserve (ht-get swoop-parameters "reserve"))
+        ($pcre    (ht-get swoop-parameters "pcre"))
+        ($migemo  (ht-get swoop-parameters "migemo")))
     (run-with-timer
      0 nil
      (lambda ($q)
-       (swoop-core :$query $q :$resume t :$multi t))
+       (cond ($pcre (setq swoop-use-pcre t))
+             ($migemo (setq swoop-use-migemo t)))
+       (swoop-core :$query $q
+                   :$resume t
+                   :$multi t
+                   :$reserve $reserve))
      $last-query)
     (exit-minibuffer)))
 ;; (define-key swoop-map (kbd "C-o") 'swoop-multi-from-swoop)
@@ -328,7 +364,7 @@ Ignore non file buffer."
     (swoop)))
 ;; (define-key evil-motion-state-map (kbd "C-o") 'swoop-from-evil-search)
 
-(defun swoop-update ($query $multi)
+(cl-defun swoop-update (&key $query $reserve $multi $pre-select)
   (when (get-buffer swoop-buffer)
     (swoop-async-kill-process)
     ;; Issue a session ID
@@ -337,11 +373,14 @@ Ignore non file buffer."
       (setq $query (split-string $query " " t)))
     (setq swoop-last-query-converted $query)
     (with-current-buffer swoop-buffer
-      (if (not $query)
+      (if (and (not $query) (not $pre-select) (not $reserve))
           (swoop-overlay-clear :$to-empty t :$multi $multi)
-        (swoop-async-divider $query $multi)))))
+        (swoop-async-divider :$query $query
+                             :$reserve $reserve
+                             :$multi $multi
+                             :$pre-select $pre-select)))))
 
-(defun swoop-async-checker ($result $tots $pattern $multi)
+(defun swoop-async-checker ($result $tots $pattern $multi $reserve)
   (let* (($id (car $result))
          ($check-key (car $id)))
     (if (equal swoop-async-id-latest $check-key)
@@ -355,10 +394,10 @@ Ignore non file buffer."
             (ht-set swoop-async-pool "number" (1+ $n))
             (when (eq $tots (1+ $n))
               (ht-remove swoop-async-pool "number")
-              (swoop-render $pattern $multi))))
+              (swoop-render $pattern $multi $reserve))))
       (setq swoop-async-id-last swoop-async-id-latest))))
 
-(cl-defun swoop-render ($pattern $multi)
+(cl-defun swoop-render ($pattern $multi $reserve)
   "Rendering results, and repositioning the selected line."
   (swoop-overlay-clear :$multi $multi)
   (setq swoop-last-selected-buffer
@@ -431,7 +470,7 @@ Ignore non file buffer."
         (swoop-header-format-line-set
          (get-text-property (point-at-bol) 'swb))))))
 
-(cl-defun swoop-async-divider ($query &optional $multi)
+(cl-defun swoop-async-divider (&key $query $reserve $multi $pre-select)
   "Divide buffers for async process."
   (with-current-buffer swoop-buffer
     (setq swoop-async-id-last swoop-async-id-latest)
@@ -440,6 +479,8 @@ Ignore non file buffer."
                    (swoop-mapc $n (swoop-buffer-info-get-map "buf-number")
                      (setq $r (+ $n $r)))
                    $r)))
+      (when $reserve
+        (setq $query (cons $reserve $query)))
       (setq swoop-last-pattern $pattern)
       (unless $multi
         (let* (($buf         swoop--target-buffer)
@@ -461,12 +502,13 @@ Ignore non file buffer."
                             (funcall ,swoop-async-get-match-lines-list
                                      ',$query ,(* $i $by)
                                      ,$line-format
-                                     ',swoop-face-line-number
-                                     ,$buf))))
+                                     ',swoop-n
+                                     ,$buf
+                                     ',$pre-select))))
              (lambda ($result)
                (when (get-buffer swoop-buffer)
                  (with-current-buffer swoop-buffer
-                   (swoop-async-checker $result $tot $pattern $multi)))
+                   (swoop-async-checker $result $tot $pattern $multi $reserve)))
                )))))
       (when $multi
         (ht-each
@@ -489,17 +531,17 @@ Ignore non file buffer."
                                (funcall ,swoop-async-get-match-lines-list
                                         ',$query ,(* $i $by)
                                         ,$line-format
-                                        ',swoop-face-line-number
+                                        ',swoop-n
                                         ,$buf))))
                 (lambda ($result)
                   (when (get-buffer swoop-buffer)
                     (with-current-buffer swoop-buffer
-                      (swoop-async-checker $result $tots $pattern $multi)))
+                      (swoop-async-checker $result $tots $pattern $multi $reserve)))
                   )))))
          swoop-buffer-info)))))
 
 ;; Minibuffer
-(defun swoop-minibuffer-read-from-string ($query $multi)
+(cl-defun swoop-minibuffer-read-from-string (&key $query $reserve $multi $pre-select)
   "Observe minibuffer inputs."
   (let (($timer nil))
     (unwind-protect
@@ -525,7 +567,10 @@ Ignore non file buffer."
                         ;; Stop old async process
                         (ht-clear! swoop-async-pool)
                         (setq swoop-minibuf-last-content $content)
-                        (swoop-update (swoop-convert-input $content) $multi)
+                        (swoop-update :$query (swoop-convert-input $content)
+                                      :$reserve $reserve
+                                      :$multi $multi
+                                      :$pre-select $pre-select)
                         )))))))
           (read-from-minibuffer
            "Swoop: " (or $query "")
