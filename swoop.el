@@ -242,7 +242,7 @@ and execute functions listed in swoop-abort-hook"
                             :$multi $multi
                             :$pre-select $pre-select)))
           (when (or $reserve $pre-select)
-            (swoop-update :$query ""
+            (swoop-update :$query (or $query "")
                           :$reserve $reserve
                           :$multi $multi
                           :$pre-select $pre-select))
@@ -324,13 +324,19 @@ Ignore non file buffer."
 ;; (define-key isearch-mode-map (kbd "C-o") 'swoop-from-isearch)
 
 ;;;###autoload
-(defun swoop-function ()
+(defun swoop-function (&optional $query)
   "Show function list in buffer judging from major-mode and regexp.
 Currently c-mode only."
   (interactive)
-  (swoop-core :$reserve
+  (swoop-core :$query (or $query (swoop-pre-input))
+              :$reserve
               (cl-case major-mode
-                (c-mode "^\\([[:alpha:]_][[:alnum:]_:<>~]*\\)[ ]*"))))
+                (c-mode
+                 (concat
+                  "^\\(\\(const\\|extern\\|static\\|unsigned\\)\\s-*\\)?"
+                  "\\(void\\|int\\|char\\|long\\|float\\|double\\)\\*?"
+                  "\\s-*\n?\\*?[[:alpha:]_][[:alnum:]_$]*\\*?"
+                  "\\((.*[^;]\\s-*$\\)")))))
 
 (defun swoop-multi-from-swoop ()
   "During swoop, switch over to swoop-multi."
