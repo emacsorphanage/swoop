@@ -14,6 +14,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'async)
 (require 'pcre2el)
 (require 'ht)
@@ -135,7 +136,7 @@ the selected line position will be at the other side of the list."
   (let (($line-num (get-text-property (point) 'swl))
         ($buf (get-text-property (point) 'swb)))
     (cl-labels ((line-action ()
-                             (recenter)
+                             (swoop-recenter)
                              (move-overlay
                               swoop-overlay-target-buffer-selection
                               (point) (min (1+ (point-at-eol)) (point-max))
@@ -211,7 +212,7 @@ the selected line position will be at the other side of the list."
      swoop-overlay-buffer-selection
      (point) (min (1+ (point-at-eol)) (point-max)))
     (swoop-line-move-within-target-window)
-    (recenter)))
+    (swoop-recenter)))
 
 ;; Window configuration
 (defvar swoop-display-function
@@ -231,7 +232,7 @@ the selected line position will be at the other side of the list."
     (let (($ov (make-overlay (point-min) (point-max))))
       (setq swoop-overlay-target-buffer (cons $ov nil))
       (overlay-put $ov 'face `(:height ,swoop-font-size:)))
-    (recenter)
+    (swoop-recenter)
     (when $multi
       (swoop-mapc $b (ht-keys swoop-buffer-info)
         (unless (equal swoop--target-buffer $b)
@@ -268,6 +269,9 @@ the selected line position will be at the other side of the list."
 (defsubst swoop-goto-line ($line)
   (goto-char (point-min))
   (forward-line (1- $line)))
+
+(defsubst swoop-recenter ()
+  (recenter (/ (window-height) 2)))
 
 (defsubst swoop-boblp (&optional $point)
   (save-excursion

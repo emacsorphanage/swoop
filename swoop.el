@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2014 by Shingo Fukuyama
 
-;; Version: Developing
+;; Version: 1.0
 ;; Author: Shingo Fukuyama - http://fukuyama.co
 ;; URL: https://github.com/ShingoFukuyama/swoop
 ;; Created: Feb 14 2014
@@ -102,7 +102,7 @@ and execute functions listed in swoop-abort-hook"
          ($lbeg2 (point-at-bol))
          ($lend2 $lbeg)
          ($lov2 (make-overlay $lbeg2 $lend2)))
-    (recenter)
+    (swoop-recenter)
     (run-with-timer 0.3 nil (lambda ($o) (delete-overlay $o)) $lov)
     (overlay-put $lov 'face 'swoop-face-target-words)
     (run-with-timer 0.3 nil (lambda ($o) (delete-overlay $o)) $lov2)
@@ -140,7 +140,7 @@ and execute functions listed in swoop-abort-hook"
            (overlay-put $lov 'face 'swoop-face-target-words)
            (run-with-timer 0.4 nil (lambda ($o) (delete-overlay $o)) $wov)
            (overlay-put $wov 'face 'swoop-face-target-line)
-           (recenter)))))
+           (swoop-recenter)))))
    (with-selected-window swoop-window
      (cons (get-text-property (point) 'swl) (get-text-property (point) 'swb))))
   (exit-minibuffer))
@@ -400,8 +400,7 @@ Currently c-mode only."
             (ht-set swoop-async-pool "number" (1+ $n))
             (when (eq $tots (1+ $n))
               (ht-remove swoop-async-pool "number")
-              (swoop-render $pattern $multi $reserve))))
-      (setq swoop-async-id-last swoop-async-id-latest))))
+              (swoop-render $pattern $multi $reserve)))))))
 
 (cl-defun swoop-render ($pattern $multi $reserve)
   "Rendering results, and repositioning the selected line."
@@ -584,7 +583,7 @@ Currently c-mode only."
       (when $timer (cancel-timer $timer) (setq $timer nil))
       (setq swoop-last-query-plain swoop-minibuf-last-content)
       (setq swoop-minibuf-last-content "")
-      (recenter))))
+      (swoop-recenter))))
 
 
 (provide 'swoop)
