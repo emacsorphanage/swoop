@@ -227,20 +227,14 @@ and execute functions listed in swoop-abort-hook"
     (unwind-protect
         (when (get-buffer swoop-buffer)
           (ht-clear! swoop-async-pool)
-          (when (or $query $resume)
+          (when $resume
             ;; Prevent following minibuffer session once
             (setq swoop-minibuf-last-content $query)
             ;; First time
-            (if (or (listp $query) $resume)
-                (if (not (equal "" $query))
-                    (swoop-update :$query swoop-last-query-converted
-                                  :$reserve $reserve
-                                  :$multi $multi
-                                  :$pre-select $pre-select))
-              (swoop-update :$query (split-string $query " " t)
-                            :$reserve $reserve
-                            :$multi $multi
-                            :$pre-select $pre-select)))
+            (swoop-update :$query swoop-last-query-converted
+                          :$reserve $reserve
+                          :$multi $multi
+                          :$pre-select $pre-select))
           (when (or $reserve $pre-select)
             (swoop-update :$query (or $query "")
                           :$reserve $reserve

@@ -41,6 +41,7 @@
 (defvar swoop-parameters (ht-create 'equal)
   "To hand over current state to swoop-multi")
 (defvar swoop-match-beginning-line nil)
+(defvar swoop-split-dinominator 3000)
 
 (defvar swoop--target-buffer nil)
 (defvar swoop--target-window nil)
@@ -323,14 +324,18 @@ the selected line position will be at the other side of the list."
    ;; PCRE
    ((and swoop-use-pcre
          (not swoop-use-migemo))
+    (setq $input (replace-regexp-in-string "\*" "\\\\*" $input))
+    (setq $input (replace-regexp-in-string "\+" "\\\\+" $input))
     (setq $input (swoop-pcre-convert $input)))
    ;; MIGEMO
    ((and swoop-use-migemo
          (not swoop-use-pcre))
     (setq $input (swoop-migemo-convert $input)))
-   ((string-match "^\\\\b$" $input) (setq $input nil))
-   ((string-match "[^\\]\\\\$" $input) (setq $input nil))
-   (t $input))
+   (t
+    (if (string-match "^\\\\b$" $input)    (setq $input nil))
+    (if (string-match "[^\\]\\\\$" $input) (setq $input nil))
+    (setq $input (replace-regexp-in-string "\*" "\\\\*" $input))
+    (setq $input (replace-regexp-in-string "\+" "\\\\+" $input))))
   $input)
 
 ;; Unveil a hidden target block of lines
@@ -367,7 +372,7 @@ swoop-overlay-target-buffer-selection moved."
            ($line-format    (concat "%0"
                                     (number-to-string $max-line-digit)
                                     "s: "))
-           ($by 3000)                      ; Buffer divide by
+           ($by swoop-split-dinominator)   ; Buffer divide by
            ($result  (/ $max-line $by))    ; Result of division
            ($rest    (% $max-line $by))    ; Rest of division
            ;; Number of divided parts of a buffer
