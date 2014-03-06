@@ -40,6 +40,7 @@
 (defvar swoop-minibuf-last-content nil)
 (defvar swoop-parameters (ht-create 'equal)
   "To hand over current state to swoop-multi")
+(defvar swoop-match-beginning-line nil)
 
 (defvar swoop--target-buffer nil)
 (defvar swoop--target-window nil)
@@ -385,9 +386,7 @@ swoop-overlay-target-buffer-selection moved."
                           (swoop-goto-line (1+ (* (1+ $i) $by))) (point)))))
                  $separated-buffer))))
       (setq swoop--target-buffer-info
-            (ht ("buf-name"                $buf)
-                ("buf-content"             $buf-content)
-                ("buf-separated" (nreverse $separated-buffer))
+            (ht ("buf-separated" (nreverse $separated-buffer))
                 ("buf-number"              $buf-num)
                 ("point"                   $point)
                 ("point-min"               $point-min)
@@ -526,7 +525,7 @@ swoop-overlay-target-buffer-selection moved."
         (process-list)))
 
 (defun swoop-async-get-match-lines-list
-  ($query $from $line-format $line-face $buf &optional $pre-select)
+  ($query $from $line-format $line-face $buf &optional $pre-select $match-beginning)
   "Distributed processing by async.el"
   ;; Prevent "Odd length text property list" error
   (setq vc-handled-backends nil)
@@ -547,7 +546,11 @@ swoop-overlay-target-buffer-selection moved."
                                            $pre-select))
                          '>)
                    nil))))
-           ($match-lines-common))
+           ($match-lines-common)
+           ($match-position-fn
+            (if $match-beginning
+                (lambda () (line-number-at-pos (match-beginning 0)))
+              (lambda () (line-number-at-pos)))))
       (goto-char $pos-min)
       (put-text-property $pos-min $pos-max 'swb $buf)
       ;; Get lines at least one match
@@ -555,7 +558,8 @@ swoop-overlay-target-buffer-selection moved."
               (save-excursion
                 (goto-char $pos-min)
                 (while (re-search-forward $q nil t)
-                  (setq $match-lines (cons (line-number-at-pos) $match-lines))
+                  (setq $match-lines (cons (funcall $match-position-fn)
+                                           $match-lines))
                   (forward-line))
                 (setq $match-total (cons $match-lines $match-total))
                 (setq $match-lines nil)))

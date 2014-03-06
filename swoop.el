@@ -259,6 +259,7 @@ and execute functions listed in swoop-abort-hook"
             (goto-char (swoop-buffer-info-get $buf "point")))))
       (setq swoop-use-pcre nil)
       (setq swoop-use-migemo nil)
+      (setq swoop-match-beginning-line nil)
       (ht-clear! swoop-parameters))))
 
 (defcustom swoop-pre-input-point-at-function:
@@ -328,23 +329,22 @@ Ignore non file buffer."
   "Show function list in buffer judging from major-mode and regexp.
 Currently c-mode only."
   (interactive)
+  (setq swoop-match-beginning-line t)
   (swoop-core :$query (or $query (swoop-pre-input))
               :$reserve
               (cl-case major-mode
                 (c-mode
                  (concat
-                  "^\\(\\(const\\|extern\\|static\\|unsigned\\)\\s-*\\)?"
-                  "\\(void\\|int\\|char\\|long\\|float\\|double\\)\\*?"
-                  "\\s-*\n?\\*?[[:alpha:]_][[:alnum:]_$]*\\*?"
-                  "\\((.*[^;]\\s-*$\\)")))))
+                  "^[[:alnum:]]+\\s-\\([[:alnum:]_:<>~]+\\s-*\\)+"
+                  "\\([^)]\\|\\s-\\)+)[^;]")))))
 
 (defun swoop-multi-from-swoop ()
   "During swoop, switch over to swoop-multi."
   (interactive)
-  (let (($last-query swoop-minibuf-last-content)
-        ($reserve (ht-get swoop-parameters "reserve"))
-        ($pcre    (ht-get swoop-parameters "pcre"))
-        ($migemo  (ht-get swoop-parameters "migemo")))
+  (let (($last-query  swoop-minibuf-last-content)
+        ($reserve     (ht-get swoop-parameters "reserve"))
+        ($pcre        (ht-get swoop-parameters "pcre"))
+        ($migemo      (ht-get swoop-parameters "migemo")))
     (run-with-timer
      0 nil
      (lambda ($q)
@@ -446,6 +446,7 @@ Currently c-mode only."
                             $con)))
                    (setq $cont (concat $cont $con))))
                swoop-async-pool)
+      (setq aa swoop-async-pool)
       (insert $cont)
       (setq $nearest-line
             (swoop-nearest-line swoop-last-selected-line $match-lines-common))
@@ -509,15 +510,18 @@ Currently c-mode only."
                                      ,$line-format
                                      ',swoop-n
                                      ,$buf
-                                     ',$pre-select))))
+                                     ',$pre-select
+                                     ,swoop-match-beginning-line))))
              (lambda ($result)
                (when (get-buffer swoop-buffer)
                  (with-current-buffer swoop-buffer
                    (swoop-async-checker $result $tot $pattern $multi $reserve)))
                )))))
+
+    (setq aaf $pattern)
       (when $multi
         (ht-each
-         (lambda ($buf $buf-hash)
+         (lambda ($b $buf-hash)
            (if (swoop-async-old-session?) (cl-return-from swoop-async-divider))
            (let* (($tot         (ht-get $buf-hash "buf-number"))
                   ($buf-sep     (ht-get $buf-hash "buf-separated"))
@@ -531,13 +535,15 @@ Currently c-mode only."
                 `(lambda ()
                    (fundamental-mode)
                    (insert ,(nth $i $buf-sep))
-                   (cons (cons ,swoop-async-id-latest ,$buf)
+                   (cons (cons ,swoop-async-id-latest ,$b)
                          (cons ,$buf-sep-id
                                (funcall ,swoop-async-get-match-lines-list
                                         ',$query ,(* $i $by)
                                         ,$line-format
                                         ',swoop-n
-                                        ,$buf))))
+                                        ,$b
+                                        ',$pre-select
+                                        ,swoop-match-beginning-line))))
                 (lambda ($result)
                   (when (get-buffer swoop-buffer)
                     (with-current-buffer swoop-buffer
@@ -548,6 +554,7 @@ Currently c-mode only."
 ;; Minibuffer
 (cl-defun swoop-minibuffer-read-from-string (&key $query $reserve $multi $pre-select)
   "Observe minibuffer inputs."
+  (if (equal "" $query) (setq swoop-minibuf-last-content nil))
   (let (($timer nil))
     (unwind-protect
         (minibuffer-with-setup-hook
