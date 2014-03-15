@@ -455,10 +455,10 @@ swoop-overlay-target-buffer-selection moved."
                                   $list) $r)))
         (if (eq 1 (length $list))
             (setq $result (car $list))
-          (let* (($lt (car
-                       (sort (filter '> $target $list) '>)))
-                 ($gt (car
-                       (sort (filter '< $target $list) '<)))
+          (let* (($lts (filter '> $target $list))
+                 ($gts (filter '< $target $list))
+                 ($lt (if $lts (apply 'max $lts)))
+                 ($gt (if $gts (apply 'min $gts)))
                  ($ltg (if $lt (- $target $lt)))
                  ($gtg (if $gt (- $gt $target))))
             (setq $result
