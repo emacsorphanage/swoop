@@ -396,7 +396,7 @@ Currently c-mode only."
               (ht-remove swoop-async-pool "number")
               (swoop-render $pattern $multi $reserve)))))))
 
-(cl-defun swoop-render ($pattern $multi $reserve)
+(cl-defun swoop-render ($pattern $multi)
   "Rendering results, and repositioning the selected line."
   (swoop-overlay-clear :$multi $multi)
   (setq swoop-last-selected-buffer
@@ -440,7 +440,6 @@ Currently c-mode only."
                             $con)))
                    (setq $cont (concat $cont $con))))
                swoop-async-pool)
-      (setq aa swoop-async-pool)
       (insert $cont)
       (setq $nearest-line
             (swoop-nearest-line swoop-last-selected-line $match-lines-common))
@@ -512,7 +511,6 @@ Currently c-mode only."
                    (swoop-async-checker $result $tot $pattern $multi $reserve)))
                )))))
 
-    (setq aaf $pattern)
       (when $multi
         (ht-each
          (lambda ($b $buf-hash)
