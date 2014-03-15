@@ -394,7 +394,7 @@ Currently c-mode only."
             (ht-set swoop-async-pool "number" (1+ $n))
             (when (eq $tots (1+ $n))
               (ht-remove swoop-async-pool "number")
-              (swoop-render $pattern $multi $reserve)))))))
+              (swoop-render $pattern $multi)))))))
 
 (cl-defun swoop-render ($pattern $multi)
   "Rendering results, and repositioning the selected line."
