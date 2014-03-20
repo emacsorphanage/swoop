@@ -615,6 +615,7 @@ swoop-overlay-target-buffer-selection moved."
   (with-current-buffer $buf
     (save-excursion
       (goto-char (point-min))
+      (overlay-recenter (point-max))
       (while (re-search-forward $pattern nil t)
         (if (swoop-async-old-session?) (cl-return-from stop1))
         (let* (($beg (match-beginning 0))

@@ -176,6 +176,7 @@ and execute functions listed in swoop-abort-hook"
              (not $kill))
         (cl-return-from swoop-overlay-clear))
     (with-current-buffer $buf
+      (overlay-recenter (point-max))
       (swoop-mapc $ov (overlays-in (point-min) (point-max))
         (if (and (swoop-async-old-session?)
                  (not $to-empty)
