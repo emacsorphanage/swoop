@@ -41,7 +41,7 @@
 (defvar swoop-parameters (ht-create 'equal)
   "To hand over current state to swoop-multi")
 (defvar swoop-match-beginning-line nil)
-(defvar swoop-split-dinominator 3000)
+(defvar swoop-split-denominator 3000)
 
 (defvar swoop--target-buffer nil)
 (defvar swoop--target-window nil)
@@ -372,7 +372,7 @@ swoop-overlay-target-buffer-selection moved."
            ($line-format    (concat "%0"
                                     (number-to-string $max-line-digit)
                                     "s: "))
-           ($by swoop-split-dinominator)   ; Buffer divide by
+           ($by swoop-split-denominator)   ; Buffer divide by
            ($result  (/ $max-line $by))    ; Result of division
            ($rest    (% $max-line $by))    ; Rest of division
            ;; Number of divided parts of a buffer

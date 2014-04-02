@@ -381,7 +381,7 @@ Currently c-mode only."
                              :$multi $multi
                              :$pre-select $pre-select)))))
 
-(defun swoop-async-checker ($result $tots $pattern $multi $reserve)
+(defun swoop-async-checker ($result $tots $pattern $multi)
   (let* (($id (car $result))
          ($check-key (car $id)))
     (if (equal swoop-async-id-latest $check-key)
@@ -509,7 +509,7 @@ Currently c-mode only."
              (lambda ($result)
                (when (get-buffer swoop-buffer)
                  (with-current-buffer swoop-buffer
-                   (swoop-async-checker $result $tot $pattern $multi $reserve)))
+                   (swoop-async-checker $result $tot $pattern $multi)))
                )))))
 
       (when $multi
@@ -540,7 +540,7 @@ Currently c-mode only."
                 (lambda ($result)
                   (when (get-buffer swoop-buffer)
                     (with-current-buffer swoop-buffer
-                      (swoop-async-checker $result $tots $pattern $multi $reserve)))
+                      (swoop-async-checker $result $tots $pattern $multi)))
                   )))))
          swoop-buffer-info)))))
 
