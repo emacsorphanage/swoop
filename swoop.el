@@ -271,7 +271,10 @@ and execute functions listed in swoop-abort-hook"
                              (region-beginning) (region-end)))
                            ((funcall swoop-pre-input-point-at-function:))
                            (t nil)))
-      (deactivate-mark))
+      (deactivate-mark)
+      (when $results
+        (setq $results (replace-regexp-in-string "\*" "\\\\*" $results))
+        (setq $results (replace-regexp-in-string "\+" "\\\\+" $results))))
     $results))
 
 ;;;###autoload

@@ -324,8 +324,6 @@ the selected line position will be at the other side of the list."
    ;; PCRE
    ((and swoop-use-pcre
          (not swoop-use-migemo))
-    (setq $input (replace-regexp-in-string "\*" "\\\\*" $input))
-    (setq $input (replace-regexp-in-string "\+" "\\\\+" $input))
     (setq $input (swoop-pcre-convert $input)))
    ;; MIGEMO
    ((and swoop-use-migemo
@@ -334,8 +332,7 @@ the selected line position will be at the other side of the list."
    (t
     (if (string-match "^\\\\b$" $input)    (setq $input nil))
     (if (string-match "[^\\]\\\\$" $input) (setq $input nil))
-    (setq $input (replace-regexp-in-string "\*" "\\\\*" $input))
-    (setq $input (replace-regexp-in-string "\+" "\\\\+" $input))))
+    (if (string-match "\\[[^\]]*$" $input) (setq $input nil))))
   $input)
 
 ;; Unveil a hidden target block of lines
