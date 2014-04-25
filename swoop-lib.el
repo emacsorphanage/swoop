@@ -193,28 +193,33 @@ the selected line position will be at the other side of the list."
           (swoop-action-goto-line-bottom)))))
 (cl-defun swoop-line-move ($direction)
   (with-selected-window swoop-window
-    (cl-case $direction
-      (up     (swoop-line-backward))
-      (down   (swoop-line-forward))
-      (top    (goto-char (point-min))
-              (swoop-line-forward))
-      (bottom (goto-char (point-max))
-              (swoop-line-backward))
-      (init (cond
-             ((and (bobp) (eobp))
-              (cl-return-from swoop-line-move nil))
-             ((bobp)
-              (swoop-line-forward)
-              (move-beginning-of-line 1))
-             ((eobp)
-              (swoop-line-backward)
-              (move-beginning-of-line 1))
-             (t (move-beginning-of-line 1)))))
-    (move-overlay
-     swoop-overlay-buffer-selection
-     (point) (min (1+ (point-at-eol)) (point-max)))
-    (swoop-line-move-within-target-window)
-    (swoop-recenter)))
+    (let ((current-pos (point)) is-init)
+      (cl-case $direction
+        (up     (swoop-line-backward))
+        (down   (swoop-line-forward))
+        (top    (unless (eq (point-min) (point-max))
+                  (goto-char (point-min))
+                  (swoop-line-forward)))
+        (bottom (unless (eq (point-min) (point-max))
+                  (goto-char (point-max))
+                  (swoop-line-backward)))
+        (init   (cond
+                 ((and (bobp) (eobp))
+                  (cl-return-from swoop-line-move nil))
+                 ((bobp)
+                  (swoop-line-forward)
+                  (move-beginning-of-line 1))
+                 ((eobp)
+                  (swoop-line-backward)
+                  (move-beginning-of-line 1))
+                 (t (move-beginning-of-line 1)))
+                 (setq is-init t)))
+      (when (or (not (eq current-pos (point))) is-init)
+        (move-overlay
+         swoop-overlay-buffer-selection
+         (point) (min (1+ (point-at-eol)) (point-max)))
+        (swoop-line-move-within-target-window)
+        (swoop-recenter)))))
 
 ;; Window configuration
 (defvar swoop-display-function
