@@ -258,7 +258,11 @@ and execute functions listed in swoop-abort-hook"
       (ht-clear! swoop-parameters))))
 
 (defcustom swoop-pre-input-point-at-function:
-  (lambda () (format "%s" (read (thing-at-point 'symbol))))
+  (lambda ()
+    (let ((query (thing-at-point 'symbol)))
+      (if query
+          (format "%s" (read query))
+        "")))
   "Change pre input action. Default is get symbol where cursor at."
   :group 'swoop :type 'symbol)
 (defun swoop-pre-input (&optional $resume)
