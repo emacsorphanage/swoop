@@ -2,7 +2,7 @@
 
 Peculiar buffer navigation for Emacs.
 
-![swoop.el](https://raw2.github.com/ShingoFukuyama/images/master/swoop.gif)
+![swoop.el](https://raw.githubusercontent.com/ShingoFukuyama/images/master/swoop.gif)
 
 ## Feature
 
