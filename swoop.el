@@ -4,7 +4,7 @@
 
 ;; Version: 1.0
 ;; Author: Shingo Fukuyama - http://fukuyama.co
-;; URL: https://github.com/ShingoFukuyama/swoop
+;; URL: https://github.com/ShingoFukuyama/emacs-swoop
 ;; Created: Feb 14 2014
 ;; Keywords: swoop inner buffer search navigation
 ;; Package-Requires: ((ht "2.0") (pcre2el "1.5") (async "1.1") (emacs "24"))
