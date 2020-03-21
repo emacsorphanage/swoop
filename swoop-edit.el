@@ -1,4 +1,4 @@
-;;; swoop-edit.el --- Peculiar buffer navigation for Emacs -*- coding: utf-8; lexical-binding: t -*-
+;;; swoop-edit.el --- Peculiar buffer navigation  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2014 by Shingo Fukuyama
 
@@ -11,6 +11,8 @@
 ;; useful, but WITHOUT ANY WARRANTY; without even the implied
 ;; warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 ;; PURPOSE.  See the GNU General Public License for more details.
+
+;;; Commentary:
 
 ;;; Code:
 
@@ -27,7 +29,7 @@
 (define-key swoop-map (kbd "C-c C-e") 'swoop-edit)
 
 (defun swoop-edit-finish ()
-  "Kill the edit buffer. Changes should have already been applied."
+  "Kill the edit buffer.  The changes should have already been applied."
   (interactive)
   (select-window swoop--target-window)
   (with-current-buffer swoop--target-buffer
@@ -51,7 +53,7 @@
       (set-marker (make-marker) (point)))))
 
 (defun swoop-edit ()
-  "Modify matched lines. Changes are automatically applying to target buffers."
+  "Modify matched lines.  Changes are automatically applying to target buffers."
   (interactive)
   (let (($bufcont (with-current-buffer swoop-buffer
                     (buffer-substring
@@ -112,6 +114,7 @@
     (exit-minibuffer)))
 
 (defun swoop-edit-sync ($beg $end $length)
+  "Sync edit."
   (save-excursion
     (goto-char $beg)
     (let* (($line-beg (point-at-bol))

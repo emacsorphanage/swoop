@@ -1,4 +1,4 @@
-;;; swoop-lib.el --- Peculiar buffer navigation for Emacs -*- coding: utf-8; lexical-binding: t -*-
+;;; swoop-lib.el --- Peculiar buffer navigation  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2014 by Shingo Fukuyama
 
@@ -11,6 +11,8 @@
 ;; useful, but WITHOUT ANY WARRANTY; without even the implied
 ;; warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
 ;; PURPOSE.  See the GNU General Public License for more details.
+
+;;; Commentary:
 
 ;;; Code:
 
@@ -39,7 +41,7 @@
 (defvar swoop-last-pattern nil)
 (defvar swoop-minibuf-last-content nil)
 (defvar swoop-parameters (ht-create 'equal)
-  "To hand over current state to swoop-multi")
+  "To hand over current state to swoop-multi.")
 (defvar swoop-match-beginning-line nil)
 (defvar swoop-split-denominator 3000)
 
@@ -82,26 +84,26 @@
   "Line number face"
   :group 'swoop)
 (defvar swoop-n 'swoop-face-line-number
-  "Abbreviate name in order to reduce async transfer size")
+  "Abbreviate name in order to reduce async transfer size.")
 
 (defcustom swoop-use-target-magnifier: nil
-  "Magnify around target line font size"
+  "Magnify around target line font size."
   :group 'swoop :type 'boolean)
 (defcustom swoop-use-target-magnifier-around: 7
-  "Magnify around target line font size"
+  "Magnify around target line font size."
   :group 'swoop :type 'boolean)
 (defcustom swoop-use-target-magnifier-size: 1.2
-  "Magnify around target line font size"
+  "Magnify around target line font size."
   :group 'swoop :type 'boolean)
 (defcustom swoop-line-move-loop: t
-  "If the selected line is at one of the edges of the list, and move further,
-the selected line position will be at the other side of the list."
+  "If the selected line is at one of the edges of the list, and move further.
+The selected line position will be at the other side of the list."
   :group 'swoop :type 'boolean)
 (defcustom swoop-window-split-current-window: nil
- "Split window when having multiple windows open"
+ "Split window when having multiple windows open."
  :group 'swoop :type 'boolean)
 (defcustom swoop-window-split-direction: 'split-window-vertically
- "Split window direction"
+ "Split window direction."
  :type '(choice (const :tag "vertically"   split-window-vertically)
                 (const :tag "horizontally" split-window-horizontally))
  :group 'swoop)
@@ -114,7 +116,7 @@ the selected line position will be at the other side of the list."
 
 
 (defmacro swoop-mapc ($variable $list &rest $body)
-  "Same as `mapc'"
+  "Same as `mapc'."
   (declare (indent 2))
   (let (($list-unique (cl-gensym)))
     `(let ((,$list-unique ,$list))
@@ -122,7 +124,7 @@ the selected line position will be at the other side of the list."
                ,@$body)
              ,$list-unique))))
 (defmacro swoop-mapcr ($variable $list &rest $body)
-  "Same as `mapcar'"
+  "Same as `mapcar'."
   (declare (indent 2))
   (let (($list-unique (cl-gensym)))
     `(let ((,$list-unique ,$list)
@@ -134,7 +136,7 @@ the selected line position will be at the other side of the list."
 
 ;; Move line up and down
 (defsubst swoop-line-move-within-target-window ()
-  "Manage the target window's behavior"
+  "Manage the target window's behavior."
   (let (($line-num (get-text-property (point) 'swl))
         ($buf (get-text-property (point) 'swb)))
     (cl-labels ((line-action ()
@@ -159,18 +161,23 @@ the selected line position will be at the other side of the list."
         (setq swoop-last-selected-buffer $buf)))))
 
 (defsubst swoop-action-goto-line-next ()
+  "Exec goto line next action."
   (interactive)
   (swoop-line-move 'down))
 (defsubst swoop-action-goto-line-prev ()
+  "Exec goto line prev action."
   (interactive)
   (swoop-line-move 'up))
 (defsubst swoop-action-goto-line-top ()
+  "Exec goto line top action."
   (interactive)
   (swoop-line-move 'top))
 (defsubst swoop-action-goto-line-bottom ()
+  "Exec goto line bottom action."
   (interactive)
   (swoop-line-move 'bottom))
 (defsubst swoop-line-forward ()
+  "Exec line forward."
   (let (($po (next-single-property-change (point) 'swl)))
     (if $po
         (if (get-text-property $po 'swl)
@@ -182,6 +189,7 @@ the selected line position will be at the other side of the list."
       (if swoop-line-move-loop:
           (swoop-action-goto-line-top)))))
 (defsubst swoop-line-backward ()
+  "Exec line backward."
   (let (($po (previous-single-property-change (point) 'swl)))
     (if $po
         (if (get-text-property $po 'swl)
@@ -192,6 +200,7 @@ the selected line position will be at the other side of the list."
       (if swoop-line-move-loop:
           (swoop-action-goto-line-bottom)))))
 (cl-defun swoop-line-move ($direction)
+  "Exec line move."
   (with-selected-window swoop-window
     (let ((current-pos (point)) is-init)
       (cl-case $direction
@@ -230,11 +239,11 @@ the selected line position will be at the other side of the list."
         (funcall swoop-window-split-direction:)))
     (other-window 1)
     (switch-to-buffer $buf))
-  "Determine how to deploy swoop window")
+  "Determine how to deploy swoop window.")
 
 ;; Font size manipulation
 (defun swoop-overlay-font-size-change (&optional $multi)
-  "Change whole buffer's text size"
+  "Change whole buffer's text size."
   (when swoop-font-size-change:
     (let (($ov (make-overlay (point-min) (point-max))))
       (setq swoop-overlay-target-buffer (cons $ov nil))
@@ -274,25 +283,30 @@ the selected line position will be at the other side of the list."
               (get-buffer $buffer))))))
 
 (defsubst swoop-goto-line ($line)
+  "Do `goto-line' considering narrowing."
   (goto-char (point-min))
   (forward-line (1- $line)))
 
 (defsubst swoop-recenter ()
+  "Recenter."
   (recenter (/ (window-height) 2)))
 
 (defsubst swoop-boblp (&optional $point)
+  "Boblp."
   (save-excursion
     (goto-char (point-min))
     (eq (line-number-at-pos)
         (progn (goto-char (or $point (point))) (line-number-at-pos)))))
 
 (defsubst swoop-eoblp (&optional $point)
+  "Eoblp."
   (save-excursion
     (goto-char (point-max))
     (eq (line-number-at-pos)
         (progn (goto-char (or $point (point))) (line-number-at-pos)))))
 
 (defun swoop-header-format-line-set ($buffer-name)
+  "Header format line set."
   (when (stringp $buffer-name)
     (with-selected-window swoop-window
       (setq header-line-format
@@ -305,6 +319,7 @@ the selected line position will be at the other side of the list."
 ;; (swoop-pcre-convert (read-string "PCRE: " "^\\s*\\w \\d{2,3}"))
 (defvar swoop-use-pcre nil)
 (defsubst swoop-pcre-convert ($query)
+  "Pcre convert."
   (nreverse
    (swoop-mapcr $q (split-string $query " " t)
      (rxt-pcre-to-elisp $q))))
@@ -315,6 +330,7 @@ the selected line position will be at the other side of the list."
 (defvar swoop-migemo-options
   "-q -e -d /usr/local/share/migemo/utf-8/migemo-dict")
 (defsubst swoop-migemo-convert ($query)
+  "Convert migemo."
   (if (executable-find "cmigemo")
       (nreverse
        (swoop-mapcr $q (split-string $query " " t)
@@ -325,6 +341,7 @@ the selected line position will be at the other side of the list."
     (error "cmigemo not found...")))
 
 (defun swoop-convert-input ($input)
+  "Convert input."
   (cond
    ;; PCRE
    ((and swoop-use-pcre
@@ -343,6 +360,7 @@ the selected line position will be at the other side of the list."
 ;; Unveil a hidden target block of lines
 (defvar swoop-invisible-targets nil)
 (defsubst swoop-restore-unveiled-overlay ()
+  "Restore unveiled overlay."
   (when swoop-invisible-targets
     (swoop-mapc $ov swoop-invisible-targets
       (overlay-put (car $ov) 'invisible (cdr $ov)))
@@ -362,7 +380,7 @@ swoop-overlay-target-buffer-selection moved."
               (cons (cons $ov $type) swoop-invisible-targets))))))
 
 (defun swoop-set-buffer-info ($buf)
-  "Collect buffers information. It's used for multiple uses."
+  "Collect buffers information.  It's used for multiple uses."
   (with-current-buffer $buf
     (let* (($buf-content    (buffer-substring-no-properties
                              (point-min) (point-max)))
@@ -406,7 +424,7 @@ swoop-overlay-target-buffer-selection moved."
   nil)
 
 (defvar swoop-multi-ignore-buffers-match "^\\*"
-  "Regexp to eliminate buffers you don't want to see")
+  "Regexp to eliminate buffers you don't want to see.")
 (defun swoop-multi-get-buffer-list ()
   (let ($buflist1 $buflist2)
     ;; eliminate buffers start with whitespace and dired buffers
@@ -533,7 +551,7 @@ swoop-overlay-target-buffer-selection moved."
 
 (defun swoop-async-get-match-lines-list
   ($query $from $line-format $line-face $buf &optional $pre-select $match-beginning)
-  "Distributed processing by async.el"
+  "Distributed processing by async.el."
   ;; Prevent "Odd length text property list" error
   (setq vc-handled-backends nil)
   (save-excursion

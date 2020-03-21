@@ -1,4 +1,4 @@
-;;; swoop.el --- Peculiar buffer navigation for Emacs -*- coding: utf-8; lexical-binding: t -*-
+;;; swoop.el --- Peculiar buffer navigation -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2014 by Shingo Fukuyama
 
@@ -6,8 +6,8 @@
 ;; Author: Shingo Fukuyama - http://fukuyama.co
 ;; URL: https://github.com/ShingoFukuyama/emacs-swoop
 ;; Created: Feb 14 2014
-;; Keywords: swoop inner buffer search navigation
-;; Package-Requires: ((ht "2.0") (pcre2el "1.5") (async "1.1") (emacs "24"))
+;; Keywords: tools swoop inner buffer search navigation
+;; Package-Requires: ((emacs "24.3") (ht "2.0") (pcre2el "1.5") (async "1.1"))
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -71,6 +71,7 @@
 
 ;; Cache control
 (defun swoop-cache-clear ()
+  "Clear cache."
   (when (not (ht-empty? swoop-buffer-info))
     (ht-clear! swoop-buffer-info)
     (swoop-async-kill-process)
@@ -80,8 +81,8 @@
 ;; Cancel action
 (defvar swoop-abort-hook nil)
 (defun swoop-action-cancel ()
-  "This is assigned to `C-g' as default. Exit from Swoop (minibuffer)
-and execute functions listed in swoop-abort-hook"
+  "This is assigned to `C-g' as default.
+Exit from Swoop (minibuffer) and execute functions listed in swoop-abort-hook."
   (interactive)
   (run-with-timer
    0 nil (lambda () (run-hooks 'swoop-abort-hook)))
@@ -94,7 +95,7 @@ and execute functions listed in swoop-abort-hook"
     (with-selected-window swoop--target-window
       (goto-char $po))))
 (defun swoop-highlight-for-cancel ()
-  "Prevent loosing sight of cursor position. It'll evaporate at once."
+  "Prevent loosing sight of cursor position.  It'll evaporate at once."
   (interactive)
   (let* (($lbeg (point))
          ($lend (point-at-eol))
@@ -112,7 +113,7 @@ and execute functions listed in swoop-abort-hook"
 
 ;; Default action
 (defun swoop-action-goto-target-point ()
-  "Finish searching and goto the target line"
+  "Finish searching and goto the target line."
   (interactive)
   (run-with-timer
    0 nil
@@ -147,7 +148,7 @@ and execute functions listed in swoop-abort-hook"
 
 ;; Overlay
 (cl-defun swoop-overlay-clear (&key $to-empty $kill $multi)
-  "Clear overlays, and kill swoop-buffer"
+  "Clear overlays, and kill swoop-buffer."
   (if (and $kill (get-buffer swoop-buffer))
       (kill-buffer swoop-buffer))
   (if swoop-use-target-magnifier:
@@ -184,13 +185,17 @@ and execute functions listed in swoop-abort-hook"
             (cl-return))
         (when (overlay-get $ov 'swoop-temporary)
           (delete-overlay $ov))))))
+
 (defsubst swoop-overlay-selection-buffer-set ()
+  "Overlay selection buffer set."
   (setq swoop-overlay-buffer-selection
         (make-overlay (point-at-bol)
                       (min (1+ (point-at-eol)) (point-max))))
   (overlay-put swoop-overlay-buffer-selection 'face 'swoop-face-target-line)
   (overlay-put swoop-overlay-buffer-selection 'priority 15))
+
 (defsubst swoop-overlay-selection-target-buffer-set ()
+  "Overlay selection target buffer set."
   (setq swoop-overlay-target-buffer-selection
         (make-overlay (point-at-bol)
                       (min (1+ (point-at-eol)) (point-max))))
@@ -257,23 +262,28 @@ and execute functions listed in swoop-abort-hook"
       (setq swoop-match-beginning-line nil)
       (ht-clear! swoop-parameters))))
 
-(defcustom swoop-pre-input-point-at-function:
+(defcustom swoop-pre-input-point-at-function
   (lambda ()
     (let ((query (thing-at-point 'symbol)))
       (if query
           (format "%s" (read query))
         "")))
-  "Change pre input action. Default is get symbol where cursor at."
+  "Change pre input action.  Default is get symbol where cursor at."
   :group 'swoop :type 'symbol)
+(define-obsolete-variable-alias
+  'swoop-pre-input-point-at-function:
+  'swoop-pre-input-point-at-function
+  1.1)
+
 (defun swoop-pre-input (&optional $resume)
-  "Pre input function. Utilize region and at point symbol"
+  "Pre input function.  Utilize region and at point symbol."
   (let ($results)
     (if $resume
         (setq $results swoop-last-query-plain)
       (setq $results (cond (mark-active
                             (buffer-substring-no-properties
                              (region-beginning) (region-end)))
-                           ((funcall swoop-pre-input-point-at-function:))
+                           ((funcall swoop-pre-input-point-at-function))
                            (t nil)))
       (deactivate-mark)
       (when $results
@@ -328,8 +338,8 @@ Ignore non file buffer."
 
 ;;;###autoload
 (defun swoop-function (&optional $query)
-  "Show function list in buffer judging from major-mode and regexp.
-Currently c-mode only."
+  "Show function list in buffer judging from `major-mode' and regexp.
+Currently `c-mode' only."
   (interactive)
   (setq swoop-match-beginning-line t)
   (swoop-core :$query (or $query (swoop-pre-input))
@@ -389,6 +399,7 @@ Currently c-mode only."
                              :$pre-select $pre-select)))))
 
 (defun swoop-async-checker ($result $tots $pattern $multi)
+  "Async checker."
   (let* (($id (car $result))
          ($check-key (car $id)))
     (if (equal swoop-async-id-latest $check-key)
@@ -516,8 +527,7 @@ Currently c-mode only."
              (lambda ($result)
                (when (get-buffer swoop-buffer)
                  (with-current-buffer swoop-buffer
-                   (swoop-async-checker $result $tot $pattern $multi)))
-               )))))
+                   (swoop-async-checker $result $tot $pattern $multi))))))))
 
       (when $multi
         (ht-each
@@ -547,8 +557,7 @@ Currently c-mode only."
                 (lambda ($result)
                   (when (get-buffer swoop-buffer)
                     (with-current-buffer swoop-buffer
-                      (swoop-async-checker $result $tots $pattern $multi)))
-                  )))))
+                      (swoop-async-checker $result $tots $pattern $multi))))))))
          swoop-buffer-info)))))
 
 ;; Minibuffer
@@ -582,8 +591,7 @@ Currently c-mode only."
                         (swoop-update :$query (swoop-convert-input $content)
                                       :$reserve $reserve
                                       :$multi $multi
-                                      :$pre-select $pre-select)
-                        )))))))
+                                      :$pre-select $pre-select))))))))
           (read-from-minibuffer
            "Swoop: " (or $query "")
            swoop-map nil swoop-minibuffer-history nil t))
