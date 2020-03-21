@@ -121,6 +121,12 @@
            ($marker (get-text-property $line-beg 'swm))
            ($buf (marker-buffer $marker))
            $col)
+      (with-current-buffer $buf
+        (when buffer-read-only
+          (if (y-or-n-p "Do you want to disable read-only-mode? ")
+              (read-only-mode -1)
+            (kill-buffer swoop-edit-buffer)
+            (error "Buffer \"%s\" is read only" (buffer-name)))))
       (when (and (get-text-property $line-beg 'swp)
                  (not (get-text-property $end 'swp)))
         (when (= $length 0)
