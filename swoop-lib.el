@@ -387,7 +387,6 @@ swoop-overlay-target-buffer-selection moved."
            ($point          (point))
            ($point-min      (point-min))
            ($point-max      (point-max))
-           ($min-line       (save-restriction (widen) (line-number-at-pos $point-min)))
            ($max-line       (line-number-at-pos $point-max))
            ($max-line-digit (length (number-to-string $max-line)))
            ($line-format    (concat "%0"
@@ -405,7 +404,7 @@ swoop-overlay-target-buffer-selection moved."
                 (cons
                  (substring-no-properties
                   $with-end-break
-                  (save-excursion (swoop-goto-line (1+ (* $i $by))) (- (point) $point-min))
+                  (1- (save-excursion (swoop-goto-line (1+ (* $i $by))) (point)))
                   (if (>= (* (1+ $i) $by) $max-line)
                       nil
                     (1- (save-excursion
@@ -417,7 +416,6 @@ swoop-overlay-target-buffer-selection moved."
                 ("point"                   $point)
                 ("point-min"               $point-min)
                 ("point-max"               $point-max)
-                ("min-line"                $min-line)
                 ("max-line"                $max-line)
                 ("max-line-digit"          $max-line-digit)
                 ("line-format"             $line-format)
@@ -552,7 +550,7 @@ swoop-overlay-target-buffer-selection moved."
         (process-list)))
 
 (defun swoop-async-get-match-lines-list
-  ($query $from $line-format $min-line $line-face $buf &optional $pre-select $match-beginning)
+  ($query $from $line-format $line-face $buf &optional $pre-select $match-beginning)
   "Distributed processing by async.el."
   ;; Prevent "Odd length text property list" error
   (setq vc-handled-backends nil)
@@ -620,7 +618,7 @@ swoop-overlay-target-buffer-selection moved."
                         (buffer-substring (point) (1+ (point-at-eol)))
                         'line-prefix
                         (propertize
-                         (format $line-format (1- (+ $line-num $min-line)))
+                         (format $line-format $line-num)
                          'face $line-face)
                         'swl $line-num)
                        $lines))))

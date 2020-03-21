@@ -507,7 +507,6 @@ Currently `c-mode' only."
                ($buf-sep     (ht-get $buf-hash "buf-separated"))
                ($by          (ht-get $buf-hash "divide-by"))
                ($line-format (ht-get $buf-hash "line-format"))
-               ($min-line    (ht-get $buf-hash "min-line"))
                ($buf-sep-id))
           (cl-dotimes ($i $tot)
             (setq $buf-sep-id (symbol-name (cl-gensym)))
@@ -521,7 +520,6 @@ Currently `c-mode' only."
                             (funcall ,swoop-async-get-match-lines-list
                                      ',$query ,(* $i $by)
                                      ,$line-format
-                                     ,$min-line
                                      ',swoop-n
                                      ,$buf
                                      ',$pre-select
@@ -539,7 +537,6 @@ Currently `c-mode' only."
                   ($buf-sep     (ht-get $buf-hash "buf-separated"))
                   ($by          (ht-get $buf-hash "divide-by"))
                   ($line-format (ht-get $buf-hash "line-format"))
-                  ($min-line    (ht-get $buf-hash "min-line"))
                   ($buf-sep-id))
              (cl-dotimes ($i $tot)
                (setq $buf-sep-id (symbol-name (cl-gensym)))
@@ -553,7 +550,6 @@ Currently `c-mode' only."
                                (funcall ,swoop-async-get-match-lines-list
                                         ',$query ,(* $i $by)
                                         ,$line-format
-                                        ,$min-line
                                         ',swoop-n
                                         ,$b
                                         ',$pre-select
