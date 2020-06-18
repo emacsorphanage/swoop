@@ -627,7 +627,9 @@ swoop-overlay-target-buffer-selection moved."
             (mapcar (lambda ($ln) (+ $ln $from)) $match-lines-common))
       (cons $match-lines-common $lines))))
 (setq swoop-async-get-match-lines-list
-      (byte-compile 'swoop-async-get-match-lines-list))
+      (if (byte-code-function-p (symbol-function 'swoop-async-get-match-lines-list))
+          (symbol-function 'swoop-async-get-match-lines-list)
+        (byte-compile 'swoop-async-get-match-lines-list)))
 
 
 (cl-defun swoop-overlay-word ($pattern $buf)
